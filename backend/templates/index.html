@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REMS - Residential Energy Management System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="login-screen">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo-icon">
+                    <i class="ph-fill ph-house"></i>
+                    <i class="ph-fill ph-lightning bolt-icon"></i>
+                </div>
+                <h2 id="login-title">Welcome to REMS</h2>
+                <p>Residential Energy Management System</p>
+            </div>
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" class="form-control" placeholder="Enter username" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" class="form-control" placeholder="Enter password" required>
+                </div>
+                <p id="login-error" class="login-error" style="display:none; color: #dc3545; font-size: 12px; margin-top: -10px; margin-bottom: 10px;">Invalid password</p>
+                <button type="submit" id="login-submit-btn" class="btn btn-primary login-btn">Sign In</button>
+                <p style="text-align: center; margin-top: 15px; font-size: 13px;">
+                    <a href="#" id="toggle-register" style="color: var(--primary); text-decoration: none;">Don't have an account? Register</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-container" id="main-app" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <i class="ph-fill ph-house"></i>
+                    <i class="ph-fill ph-lightning bolt-icon"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>REMS</h1>
+                    <p>Residential Energy Management System<br>with Power Factor Correction</p>
+                </div>
+            </div>
+
+            <nav class="main-nav">
+                <ul>
+                    <li class="active" data-page="dashboard">
+                        <i class="ph ph-squares-four"></i>
+                        <span>Dashboard</span>
+                    </li>
+                    <li data-page="energy-monitoring">
+                        <i class="ph ph-lightning"></i>
+                        <span>Energy Monitoring</span>
+                    </li>
+                    <li data-page="power-factor">
+                        <i class="ph ph-chart-line-up"></i>
+                        <span>Power Factor Analysis</span>
+                    </li>
+                    <li data-page="load-control">
+                        <i class="ph ph-sliders-horizontal"></i>
+                        <span>Load Control</span>
+                    </li>
+                    <li data-page="ai-recommendations">
+                        <i class="ph ph-sparkle"></i>
+                        <span>AI Recommendations</span>
+                    </li>
+                    <li data-page="historical-reports">
+                        <i class="ph ph-file-text"></i>
+                        <span>Historical Reports</span>
+                    </li>
+                    <li data-page="alerts">
+                        <i class="ph ph-bell"></i>
+                        <span>Alerts & Notifications</span>
+                    </li>
+                    <li data-page="settings">
+                        <i class="ph ph-gear"></i>
+                        <span>Settings</span>
+                    </li>
+                    <li data-page="about">
+                        <i class="ph ph-info"></i>
+                        <span>About System</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <h4>System Status</h4>
+                    <div class="status-indicator">
+                        <span class="dot online"></span>
+                        <span>Online</span>
+                    </div>
+                </div>
+                <div class="datetime">
+                    <span id="current-date">August 06, 2026</span>
+                    <span id="current-time">5:25 pm EST</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button id="mobile-menu-btn" class="mobile-only">
+                        <i class="ph ph-list"></i>
+                    </button>
+                    <h2 id="page-title">DASHBOARD</h2>
+                </div>
+                <div class="topbar-right">
+                    <button class="icon-btn">
+                        <i class="ph ph-bell"></i>
+                    </button>
+                    <div class="user-profile" id="user-profile-btn">
+                        <div class="avatar">
+                            <i class="ph-fill ph-user"></i>
+                        </div>
+                        <span id="display-role">Admin</span>
+                        <i class="ph ph-caret-down"></i>
+                        
+                        <!-- Profile Dropdown -->
+                        <div class="profile-dropdown" id="profile-dropdown">
+                            <ul>
+                                <li id="logout-btn">
+                                    <i class="ph ph-sign-out"></i>
+                                    Log Out
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content" id="content-area">
+                <!-- Content will be dynamically loaded here by app.js -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Page Templates -->
+    <template id="tpl-dashboard">
+        <div class="dashboard-grid">
+            <!-- Top Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card" id="card-total-power">
+                    <div class="stat-header">
+                        <i class="ph-fill ph-lightning" style="color: var(--primary); font-size: 24px;"></i>
+                        <h3>Total Power</h3>
+                    </div>
+                    <div class="stat-value"><span id="val-total-power">3.42</span> <span class="unit">kW</span></div>
+                    <div class="stat-subtext">Real-time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <i class="ph-fill ph-chart-bar" style="color: var(--primary); font-size: 24px;"></i>
+                        <h3>Energy Today</h3>
+                    </div>
+                    <div class="stat-value">18.6 <span class="unit">kWh</span></div>
+                    <div class="stat-subtext" style="color: var(--primary);">↑ 12% vs yesterday</div>
+                </div>
+                <div class="stat-card" id="card-power-factor">
+                    <div class="stat-header">
+                        <i class="ph-fill ph-activity" style="color: #a855f7; font-size: 24px;"></i>
+                        <h3>Power Factor</h3>
+                    </div>
+                    <div class="stat-value" id="val-power-factor">0.94</div>
+                    <div class="stat-subtext" style="color: #a855f7;">Lagging</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <i class="ph-fill ph-leaf" style="color: var(--primary); font-size: 24px;"></i>
+                        <h3>CO₂ Saved</h3>
+                    </div>
+                    <div class="stat-value">5.3 <span class="unit">kg</span></div>
+                    <div class="stat-subtext">Today</div>
+                </div>
+            </div>
+
+            <!-- Middle Row -->
+            <div class="middle-row" style="grid-template-columns: 1fr 1fr 2fr;">
+                <div class="card pf-card">
+                    <div class="card-header">
+                        <h3>POWER FACTOR</h3>
+                    </div>
+                    <div class="card-body centered-content">
+                        <div class="gauge-container" style="text-align: center;">
+                            <div class="pf-value-large" id="gauge-power-factor" style="color: var(--primary);">0.94</div>
+                            <div class="pf-status good" id="gauge-status" style="color: var(--primary);">Excellent</div>
+                            <div style="font-size: 11px; margin-top: 10px; color: var(--text-muted); text-align: left;">
+                                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 6px; height: 6px; background: var(--primary); border-radius: 50%;"></div> Target: 0.95</div>
+                                <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;"><div style="width: 6px; height: 6px; background: var(--primary); border-radius: 50%;"></div> Status: Capacitor Bank Active</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card power-quality-card">
+                    <div class="card-header">
+                        <h3>POWER QUALITY (LIVE)</h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="status-list" style="gap: 12px; font-size: 13px;">
+                            <li>
+                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-lightning" style="color: #3b82f6;"></i> Voltage</div>
+                                <span id="val-voltage">229.7 V</span>
+                            </li>
+                            <li>
+                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-wave-sine" style="color: #f59e0b;"></i> Current</div>
+                                <span id="val-current">15.1 A</span>
+                            </li>
+                            <li>
+                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-letter-p" style="color: var(--primary);"></i> Real Power</div>
+                                <span id="val-real-power">3.42 kW</span>
+                            </li>
+                            <li>
+                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-letter-q" style="color: #a855f7;"></i> Reactive Power</div>
+                                <span>0.88 kVAR</span>
+                            </li>
+                            <li>
+                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-letter-s" style="color: #06b6d4;"></i> Apparent Power</div>
+                                <span>3.53 kVA</span>
+                            </li>
+                            <li>
+                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-activity" style="color: #ef4444;"></i> Frequency</div>
+                                <span>60.02 Hz</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card pf-trend-card">
+                    <div class="card-header">
+                        <h3>POWER FACTOR TREND (TODAY)</h3>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="pfTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row -->
+            <div class="bottom-row" style="grid-template-columns: 2fr 1fr 2fr;">
+                <div class="card consumption-card">
+                    <div class="card-header flex-header">
+                        <h3>ENERGY CONSUMPTION (kWh)</h3>
+                        <div class="time-filters">
+                            <button class="filter-btn active">Day</button>
+                            <button class="filter-btn">Week</button>
+                            <button class="filter-btn">Month</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="consumptionChart"></canvas>
+                    </div>
+                </div>
+                <div class="card distribution-card">
+                    <div class="card-header">
+                        <h3>LOAD DISTRIBUTION</h3>
+                    </div>
+                    <div class="card-body distribution-body flex-row" style="flex-direction: row; align-items: center; gap: 20px;">
+                        <div class="chart-container" style="width: 120px; height: 120px;">
+                            <canvas id="distributionChart"></canvas>
+                        </div>
+                        <div class="legend-container" id="distributionLegend" style="margin-top: 0; flex: 1;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+                <div class="card ai-recommendations-card">
+                    <div class="card-header">
+                        <h3>AI RECOMMENDATIONS</h3>
+                    </div>
+                    <div class="card-body" style="overflow-y: auto; max-height: 200px;">
+                        <ul class="status-list" style="gap: 12px; font-size: 12px;">
+                            <li>
+                                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                    <i class="ph-fill ph-lightbulb" style="color: #f59e0b; font-size: 16px; margin-top: 2px;"></i>
+                                    <div>
+                                        <div style="font-weight: 600;">Living room lights have been ON for 4 hours.</div>
+                                        <div style="color: var(--text-muted);">Consider turning OFF to save energy.</div>
+                                    </div>
+                                </div>
+                                <i class="ph ph-caret-right" style="color: var(--text-muted);"></i>
+                            </li>
+                            <li>
+                                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                    <i class="ph-fill ph-thermometer" style="color: #3b82f6; font-size: 16px; margin-top: 2px;"></i>
+                                    <div>
+                                        <div style="font-weight: 600;">Air conditioner is operating at low efficiency.</div>
+                                        <div style="color: var(--text-muted);">Recommended temperature: 25°C</div>
+                                    </div>
+                                </div>
+                                <i class="ph ph-caret-right" style="color: var(--text-muted);"></i>
+                            </li>
+                            <li>
+                                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                    <i class="ph-fill ph-activity" style="color: var(--primary); font-size: 16px; margin-top: 2px;"></i>
+                                    <div>
+                                        <div style="font-weight: 600;">Power factor dropped below 0.90 at 7:35 AM.</div>
+                                        <div style="color: var(--text-muted);">Capacitor bank was automatically switched ON.</div>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-energy-monitoring">
+        <div class="tab-container">
+            <div class="tabs-header">
+                <div class="tabs">
+                    <button class="tab active">Overview</button>
+                    <button class="tab">Voltage</button>
+                    <button class="tab">Current</button>
+                    <button class="tab">Power</button>
+                    <button class="tab">Energy</button>
+                </div>
+                <div class="date-picker">
+                    <select>
+                        <option>Aug. 07, 2026</option>
+                    </select>
+                </div>
+            </div>
+            <div class="tab-content grid-layout">
+                <div class="card"><div class="placeholder-content">Voltage Trend</div></div>
+                <div class="card"><div class="placeholder-content">Current Trend</div></div>
+                <div class="card"><div class="placeholder-content">Active Power</div></div>
+                <div class="card"><div class="placeholder-content">Energy Consumption</div></div>
+                
+                <div class="card col-span-4 row-span-2"><div class="placeholder-content">Detailed Branch Analysis</div></div>
+                
+                <div class="card col-span-2"><div class="placeholder-content">Real-time Metrics Table</div></div>
+                <div class="card col-span-2"><div class="placeholder-content">Alerts/Warnings History</div></div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-ai-recommendations">
+        <div class="card" style="margin: 20px; min-height: 400px;">
+            <div class="card-header">
+                <h3>AI SUGGESTIONS & ANOMALY ALERTS</h3>
+            </div>
+            <div class="card-body">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Timestamp</th>
+                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">AI Suggestion</th>
+                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Confidence</th>
+                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ai-suggestions-list">
+                        <!-- Populated via JS -->
+                        <tr>
+                            <td colspan="4" style="padding: 20px; text-align: center; color: var(--text-muted);">
+                                Loading suggestions...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-settings">
+        <div class="tab-container">
+            <div class="tabs-header">
+                <div class="tabs">
+                    <button class="tab active">General</button>
+                    <button class="tab">PFC Settings</button>
+                    <button class="tab">Users</button>
+                    <button class="tab">Systems</button>
+                </div>
+            </div>
+            
+            <div class="settings-layout">
+                <div class="settings-panel">
+                    <h3 class="panel-title">SYSTEM SETTINGS</h3>
+                    
+                    <div class="form-group">
+                        <label>System Name</label>
+                        <input type="text" value="REMS" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input type="text" value="Rojas Residence" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Time Zone</label>
+                        <select class="form-control">
+                            <option>(GMT+08:00) Asia, Philippines</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group date-time-sync">
+                        <div>
+                            <label>Date & Time</label>
+                            <div class="current-dt">August 7, 2026 4:04 PM</div>
+                        </div>
+                        <button class="btn btn-secondary">Sync</button>
+                    </div>
+                    
+                    <div class="form-actions right">
+                        <button class="btn btn-primary">SAVE CHANGES</button>
+                    </div>
+                </div>
+                
+                <div class="settings-panel">
+                    <h3 class="panel-title">PFC SETTINGS (AUTO-CORRECTION)</h3>
+                    
+                    <div class="form-group">
+                        <label>Target Power Factor</label>
+                        <input type="text" value="0.95" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Minimum PF Limit</label>
+                        <input type="text" value="0.90" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Capacitor Switching Delay</label>
+                        <input type="text" value="30 sec" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Reconnection Delay</label>
+                        <input type="text" value="60 sec" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Capacitor Bank Sequence</label>
+                        <input type="text" value="C1 → C2 → C3" class="form-control">
+                    </div>
+                    
+                    <div class="form-actions right">
+                        <button class="btn btn-primary">SAVE CHANGES</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Generic Template for other pages -->
+    <template id="tpl-generic">
+        <div class="generic-placeholder">
+            <i class="ph ph-wrench title-icon"></i>
+            <h2>Page Under Construction</h2>
+            <p>This module is currently being developed.</p>
+        </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
