@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REMS - Residential Energy Management System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>REMS - Residential Energy Management Control System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles_v4.css') }}?v=21">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Chart.js for graphs -->
@@ -19,87 +19,82 @@
                     <i class="ph-fill ph-house"></i>
                     <i class="ph-fill ph-lightning bolt-icon"></i>
                 </div>
-                <h2 id="login-title">Welcome to REMS</h2>
-                <p>Residential Energy Management System</p>
+                <h2 id="login-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Welcome to REMS</h2>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Development of an AI-Assisted Residential Energy<br>Management Control System</p>
             </div>
             <form id="login-form" class="login-form">
                 <div class="form-group">
                     <label for="login-username">Username</label>
-                    <input type="text" id="login-username" class="form-control" placeholder="Enter username" required>
+                    <input type="text" id="login-username" class="form-control" placeholder="admin" value="admin" required>
                 </div>
                 <div class="form-group">
                     <label for="login-password">Password</label>
-                    <input type="password" id="login-password" class="form-control" placeholder="Enter password" required>
+                    <input type="password" id="login-password" class="form-control" placeholder="admin123" value="admin123" required>
                 </div>
-                <p id="login-error" class="login-error" style="display:none; color: #dc3545; font-size: 12px; margin-top: -10px; margin-bottom: 10px;">Invalid password</p>
-                <button type="submit" id="login-submit-btn" class="btn btn-primary login-btn">Sign In</button>
-                <p style="text-align: center; margin-top: 15px; font-size: 13px;">
+                <p id="login-error" class="login-error" style="display:none; color: #ef4444; font-size: 12px; margin-top: -8px; margin-bottom: 12px;">Invalid password</p>
+                <button type="submit" id="login-submit-btn" class="btn btn-primary" style="width: 100%; padding: 10px; font-size: 13px;">Sign In</button>
+                <p style="text-align: center; margin-top: 14px; font-size: 12px;">
                     <a href="#" id="toggle-register" style="color: var(--primary); text-decoration: none;">Don't have an account? Register</a>
                 </p>
             </form>
         </div>
     </div>
 
+    <!-- Main Application Shell -->
     <div class="app-container" id="main-app" style="display: none;">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="logo-container">
-                <div class="logo-icon">
-                    <i class="ph-fill ph-house"></i>
-                    <i class="ph-fill ph-lightning bolt-icon"></i>
+            <div>
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <i class="ph-fill ph-house"></i>
+                        <i class="ph-fill ph-lightning bolt-icon"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>REMS</h1>
+                        <p>Development of an AI-Assisted Residential Energy<br>Management Control System</p>
+                    </div>
                 </div>
-                <div class="logo-text">
-                    <h1>REMS</h1>
-                    <p>Residential Energy Management System<br>with Power Factor Correction</p>
-                </div>
-            </div>
 
-            <nav class="main-nav">
-                <ul>
-                    <li class="active" data-page="dashboard">
-                        <i class="ph ph-squares-four"></i>
-                        <span>Dashboard</span>
-                    </li>
-                    <li data-page="energy-monitoring">
-                        <i class="ph ph-lightning"></i>
-                        <span>Energy Monitoring</span>
-                    </li>
-                    <li data-page="power-factor">
-                        <i class="ph ph-chart-line-up"></i>
-                        <span>Power Factor Analysis</span>
-                    </li>
-                    <li data-page="load-control">
-                        <i class="ph ph-sliders-horizontal"></i>
-                        <span>Load Control</span>
-                    </li>
-                    <li data-page="ai-recommendations">
-                        <i class="ph ph-sparkle"></i>
-                        <span>AI Recommendations</span>
-                    </li>
-                    <li data-page="historical-reports">
-                        <i class="ph ph-file-text"></i>
-                        <span>Historical Reports</span>
-                    </li>
-                    <li data-page="alerts">
-                        <i class="ph ph-bell"></i>
-                        <span>Alerts & Notifications</span>
-                    </li>
-                    <li data-page="settings">
-                        <i class="ph ph-gear"></i>
-                        <span>Settings</span>
-                    </li>
-                    <li data-page="about">
-                        <i class="ph ph-info"></i>
-                        <span>About System</span>
-                    </li>
-                </ul>
-            </nav>
+                <nav class="main-nav">
+                    <ul>
+                        <li class="active" data-page="dashboard">
+                            <i class="ph ph-squares-four"></i>
+                            <span>Dashboard</span>
+                        </li>
+                        <li data-page="energy-monitoring">
+                            <i class="ph ph-lightning"></i>
+                            <span>Energy Monitoring</span>
+                        </li>
+                        <li data-page="load-control">
+                            <i class="ph ph-sliders-horizontal"></i>
+                            <span>Load Control</span>
+                        </li>
+                        <li data-page="ai-recommendations">
+                            <i class="ph ph-sparkle"></i>
+                            <span>AI Recommendations</span>
+                        </li>
+                        <li data-page="alerts">
+                            <i class="ph ph-bell"></i>
+                            <span>Alerts & Notifications</span>
+                        </li>
+                        <li data-page="settings">
+                            <i class="ph ph-gear"></i>
+                            <span>Settings</span>
+                        </li>
+                        <li data-page="about">
+                            <i class="ph ph-info"></i>
+                            <span>About System</span>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
 
             <div class="sidebar-footer">
                 <div class="system-status">
-                    <h4>System Status</h4>
+                    <span>System Status</span>
                     <div class="status-indicator">
-                        <span class="dot online"></span>
+                        <span class="dot"></span>
                         <span>Online</span>
                     </div>
                 </div>
@@ -114,13 +109,13 @@
         <main class="main-content">
             <header class="topbar">
                 <div class="topbar-left">
-                    <button id="mobile-menu-btn" class="mobile-only">
-                        <i class="ph ph-list"></i>
+                    <button id="sidebar-toggle-btn" class="icon-btn" title="Toggle Sidebar" style="color: #ffffff; cursor: pointer; margin-right: 6px;">
+                        <i class="ph ph-list" style="font-size: 22px;"></i>
                     </button>
                     <h2 id="page-title">DASHBOARD</h2>
                 </div>
                 <div class="topbar-right">
-                    <button class="icon-btn">
+                    <button class="icon-btn" onclick="navigateToPage('alerts')">
                         <i class="ph ph-bell"></i>
                     </button>
                     <div class="user-profile" id="user-profile-btn">
@@ -128,7 +123,7 @@
                             <i class="ph-fill ph-user"></i>
                         </div>
                         <span id="display-role">Admin</span>
-                        <i class="ph ph-caret-down"></i>
+                        <i class="ph ph-caret-down" style="font-size: 11px; color: var(--text-muted);"></i>
                         
                         <!-- Profile Dropdown -->
                         <div class="profile-dropdown" id="profile-dropdown">
@@ -144,328 +139,772 @@
             </header>
 
             <div class="page-content" id="content-area">
-                <!-- Content will be dynamically loaded here by app.js -->
+                <!-- Injected via JavaScript from templates -->
             </div>
         </main>
     </div>
 
-    <!-- Page Templates -->
+    <!-- ========================================================================= -->
+    <!-- TEMPLATES SECTION (Matches DETAILS NG IPAPACODE (4).pdf)                  -->
+    <!-- ========================================================================= -->
+
+    <!-- 1. DASHBOARD TEMPLATE -->
     <template id="tpl-dashboard">
-        <div class="dashboard-grid">
-            <!-- Top Stats Row -->
-            <div class="stats-row">
-                <div class="stat-card" id="card-total-power">
-                    <div class="stat-header">
-                        <i class="ph-fill ph-lightning" style="color: var(--primary); font-size: 24px;"></i>
-                        <h3>Total Power</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Top Stats Row (3 Cards) -->
+            <div style="display: grid; grid-template-columns: 1.2fr 2fr 1.2fr; gap: 16px;">
+                <!-- Card 1: Total Power Consumed -->
+                <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                    <div class="card-header">
+                        <h3>Total Power Consumed</h3>
                     </div>
-                    <div class="stat-value"><span id="val-total-power">3.42</span> <span class="unit">kW</span></div>
-                    <div class="stat-subtext">Real-time</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+                        <div style="display: flex; align-items: center; gap: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 8px 14px; border-radius: 8px;">
+                            <i class="ph-fill ph-lightning" style="color: #60a5fa; font-size: 24px;"></i>
+                            <div>
+                                <div style="font-size: 20px; font-weight: 800; color: #ffffff;" id="val-total-power">0.00 kW</div>
+                                <div style="font-size: 10px; color: var(--text-muted);">Real-time</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 8px 14px; border-radius: 8px;">
+                            <i class="ph-fill ph-chart-bar" style="color: var(--primary); font-size: 22px;"></i>
+                            <div style="font-size: 18px; font-weight: 800; color: #ffffff;" id="val-energy-today">0.0 kWh</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <i class="ph-fill ph-chart-bar" style="color: var(--primary); font-size: 24px;"></i>
+
+                <!-- Card 2: Energy Today Chart -->
+                <div class="card" style="display: flex; flex-direction: column;">
+                    <div class="card-header" style="margin-bottom: 4px;">
                         <h3>Energy Today</h3>
                     </div>
-                    <div class="stat-value">18.6 <span class="unit">kWh</span></div>
-                    <div class="stat-subtext" style="color: var(--primary);">↑ 12% vs yesterday</div>
-                </div>
-                <div class="stat-card" id="card-power-factor">
-                    <div class="stat-header">
-                        <i class="ph-fill ph-activity" style="color: #a855f7; font-size: 24px;"></i>
-                        <h3>Power Factor</h3>
+                    <div style="flex: 1; min-height: 80px; position: relative;">
+                        <canvas id="energyTodayChart"></canvas>
                     </div>
-                    <div class="stat-value" id="val-power-factor">0.94</div>
-                    <div class="stat-subtext" style="color: #a855f7;">Lagging</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <i class="ph-fill ph-leaf" style="color: var(--primary); font-size: 24px;"></i>
-                        <h3>CO₂ Saved</h3>
+
+                <!-- Card 3: Power Factor (pf) -->
+                <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                    <div class="card-header">
+                        <h3>Power Factor (pf)</h3>
                     </div>
-                    <div class="stat-value">5.3 <span class="unit">kg</span></div>
-                    <div class="stat-subtext">Today</div>
+                    <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-wave-sine" style="font-size: 24px; color: #c084fc;"></i>
+                            <span style="font-size: 24px; font-weight: 800; color: #ffffff;" id="val-power-factor">0.00</span>
+                        </div>
+                        <span class="badge-pill" style="background: rgba(168, 85, 247, 0.2); color: #e9d5ff; font-size: 12px;" id="val-pf-badge">--</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Middle Row -->
-            <div class="middle-row" style="grid-template-columns: 1fr 1fr 2fr;">
-                <div class="card pf-card">
+            <!-- Middle Row (3 Cards: Gauge, Trend, Quick Status) -->
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 16px;">
+                <!-- Gauge Card -->
+                <div class="card">
                     <div class="card-header">
-                        <h3>POWER FACTOR</h3>
+                        <h3>POWER FACTOR (PF)</h3>
                     </div>
-                    <div class="card-body centered-content">
-                        <div class="gauge-container" style="text-align: center;">
-                            <div class="pf-value-large" id="gauge-power-factor" style="color: var(--primary);">0.94</div>
-                            <div class="pf-status good" id="gauge-status" style="color: var(--primary);">Excellent</div>
-                            <div style="font-size: 11px; margin-top: 10px; color: var(--text-muted); text-align: left;">
-                                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 6px; height: 6px; background: var(--primary); border-radius: 50%;"></div> Target: 0.95</div>
-                                <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;"><div style="width: 6px; height: 6px; background: var(--primary); border-radius: 50%;"></div> Status: Capacitor Bank Active</div>
+                    <div style="display: flex; flex-direction: column; align-items: center; padding: 10px 0;">
+                        <div class="gauge-wrapper">
+                            <canvas id="pfGaugeChart" width="160" height="90"></canvas>
+                            <div class="gauge-val-big" id="gauge-power-factor">0.00</div>
+                            <div class="gauge-status-sub" id="gauge-status">Standby</div>
+                        </div>
+                        <div style="margin-top: 14px; width: 100%; border-top: 1px solid var(--border-color); padding-top: 10px; font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--primary);"></div>
+                                <span>Target: 0.95</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--primary);"></div>
+                                <span>Status: Automatic Monitor</span>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="card power-quality-card">
-                    <div class="card-header">
-                        <h3>POWER QUALITY (LIVE)</h3>
-                    </div>
-                    <div class="card-body">
-                        <ul class="status-list" style="gap: 12px; font-size: 13px;">
-                            <li>
-                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-lightning" style="color: #3b82f6;"></i> Voltage</div>
-                                <span id="val-voltage">229.7 V</span>
-                            </li>
-                            <li>
-                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-wave-sine" style="color: #f59e0b;"></i> Current</div>
-                                <span id="val-current">15.1 A</span>
-                            </li>
-                            <li>
-                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-letter-p" style="color: var(--primary);"></i> Real Power</div>
-                                <span id="val-real-power">3.42 kW</span>
-                            </li>
-                            <li>
-                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-letter-q" style="color: #a855f7;"></i> Reactive Power</div>
-                                <span>0.88 kVAR</span>
-                            </li>
-                            <li>
-                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-letter-s" style="color: #06b6d4;"></i> Apparent Power</div>
-                                <span>3.53 kVA</span>
-                            </li>
-                            <li>
-                                <div style="display: flex; align-items: center; gap: 8px;"><i class="ph ph-activity" style="color: #ef4444;"></i> Frequency</div>
-                                <span>60.02 Hz</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="card pf-trend-card">
+
+                <!-- PF Trend Chart -->
+                <div class="card">
                     <div class="card-header">
                         <h3>POWER FACTOR TREND (TODAY)</h3>
                     </div>
-                    <div class="card-body">
+                    <div style="height: 190px; position: relative;">
                         <canvas id="pfTrendChart"></canvas>
                     </div>
                 </div>
-            </div>
 
-            <!-- Bottom Row -->
-            <div class="bottom-row" style="grid-template-columns: 2fr 1fr 2fr;">
-                <div class="card consumption-card">
-                    <div class="card-header flex-header">
-                        <h3>ENERGY CONSUMPTION (kWh)</h3>
-                        <div class="time-filters">
-                            <button class="filter-btn active">Day</button>
-                            <button class="filter-btn">Week</button>
-                            <button class="filter-btn">Month</button>
+                <!-- Quick Status Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>QUICK STATUS</h3>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                <i class="ph ph-lightning" style="color: #60a5fa;"></i> Voltage
+                            </div>
+                            <span style="font-weight: 700; font-size: 13px;" id="val-voltage">0.0 V</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                <i class="ph ph-wave-sine" style="color: #facc15;"></i> Current
+                            </div>
+                            <span style="font-weight: 700; font-size: 13px;" id="val-current">0.0 A</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                <i class="ph ph-plug" style="color: var(--primary);"></i> Real Power
+                            </div>
+                            <span style="font-weight: 700; font-size: 13px;" id="val-real-power">0.00 kW</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                                <i class="ph ph-activity" style="color: #f87171;"></i> Frequency
+                            </div>
+                            <span style="font-weight: 700; font-size: 13px;" id="val-frequency">0.00 Hz</span>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <canvas id="consumptionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Bottom Row (2 Cards: Energy Consumption Bar + Load Distribution Donut) -->
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px;">
+                <!-- Bar Chart -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>ENERGY CONSUMPTION (kWh)</h3>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="sub-tab-btn active" id="btn-cons-weekly" style="padding: 3px 10px; font-size: 11px;">Weekly</button>
+                            <button class="sub-tab-btn" id="btn-cons-monthly" style="padding: 3px 10px; font-size: 11px;">Monthly</button>
+                        </div>
+                    </div>
+                    <div style="height: 180px; position: relative;">
+                        <canvas id="consumptionBarChart"></canvas>
                     </div>
                 </div>
-                <div class="card distribution-card">
+
+                <!-- Donut Chart -->
+                <div class="card">
                     <div class="card-header">
                         <h3>LOAD DISTRIBUTION</h3>
                     </div>
-                    <div class="card-body distribution-body flex-row" style="flex-direction: row; align-items: center; gap: 20px;">
-                        <div class="chart-container" style="width: 120px; height: 120px;">
-                            <canvas id="distributionChart"></canvas>
+                    <div style="display: flex; align-items: center; justify-content: space-around; height: 180px;">
+                        <div style="width: 140px; height: 140px; position: relative;">
+                            <canvas id="distributionDonutChart"></canvas>
                         </div>
-                        <div class="legend-container" id="distributionLegend" style="margin-top: 0; flex: 1;">
-                            <!-- Populated by JS -->
+                        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 11px;">
+                            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 50%; background: #4ade80;"></div> Living Room</div>
+                            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></div> Bedroom</div>
+                            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 50%; background: #eab308;"></div> Kitchen</div>
+                            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 50%; background: #86efac;"></div> Air Conditioner</div>
                         </div>
-                    </div>
-                </div>
-                <div class="card ai-recommendations-card">
-                    <div class="card-header">
-                        <h3>AI RECOMMENDATIONS</h3>
-                    </div>
-                    <div class="card-body" style="overflow-y: auto; max-height: 200px;">
-                        <ul class="status-list" style="gap: 12px; font-size: 12px;">
-                            <li>
-                                <div style="display: flex; gap: 10px; align-items: flex-start;">
-                                    <i class="ph-fill ph-lightbulb" style="color: #f59e0b; font-size: 16px; margin-top: 2px;"></i>
-                                    <div>
-                                        <div style="font-weight: 600;">Living room lights have been ON for 4 hours.</div>
-                                        <div style="color: var(--text-muted);">Consider turning OFF to save energy.</div>
-                                    </div>
-                                </div>
-                                <i class="ph ph-caret-right" style="color: var(--text-muted);"></i>
-                            </li>
-                            <li>
-                                <div style="display: flex; gap: 10px; align-items: flex-start;">
-                                    <i class="ph-fill ph-thermometer" style="color: #3b82f6; font-size: 16px; margin-top: 2px;"></i>
-                                    <div>
-                                        <div style="font-weight: 600;">Air conditioner is operating at low efficiency.</div>
-                                        <div style="color: var(--text-muted);">Recommended temperature: 25°C</div>
-                                    </div>
-                                </div>
-                                <i class="ph ph-caret-right" style="color: var(--text-muted);"></i>
-                            </li>
-                            <li>
-                                <div style="display: flex; gap: 10px; align-items: flex-start;">
-                                    <i class="ph-fill ph-activity" style="color: var(--primary); font-size: 16px; margin-top: 2px;"></i>
-                                    <div>
-                                        <div style="font-weight: 600;">Power factor dropped below 0.90 at 7:35 AM.</div>
-                                        <div style="color: var(--text-muted);">Capacitor bank was automatically switched ON.</div>
-                                    </div>
-                                </div>
-                            </li>
-                        </ul>
                     </div>
                 </div>
             </div>
         </div>
     </template>
 
+    <!-- 2. ENERGY MONITORING TEMPLATE -->
     <template id="tpl-energy-monitoring">
-        <div class="tab-container">
-            <div class="tabs-header">
-                <div class="tabs">
-                    <button class="tab active">Overview</button>
-                    <button class="tab">Voltage</button>
-                    <button class="tab">Current</button>
-                    <button class="tab">Power</button>
-                    <button class="tab">Energy</button>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Sub-Tabs Header -->
+            <div class="sub-tabs-container">
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" onclick="switchEnergyTab('overview')">Overview</button>
+                    <button class="sub-tab-btn" onclick="switchEnergyTab('voltage')">Voltage</button>
+                    <button class="sub-tab-btn" onclick="switchEnergyTab('current')">Current</button>
+                    <button class="sub-tab-btn" onclick="switchEnergyTab('power')">Power</button>
+                    <button class="sub-tab-btn" onclick="switchEnergyTab('pf')">pf</button>
                 </div>
-                <div class="date-picker">
-                    <select>
-                        <option>Aug. 07, 2026</option>
+                <div>
+                    <select class="select-dark">
+                        <option>Monthly</option>
+                        <option>Daily</option>
                     </select>
                 </div>
             </div>
-            <div class="tab-content grid-layout">
-                <div class="card"><div class="placeholder-content">Voltage Trend</div></div>
-                <div class="card"><div class="placeholder-content">Current Trend</div></div>
-                <div class="card"><div class="placeholder-content">Active Power</div></div>
-                <div class="card"><div class="placeholder-content">Energy Consumption</div></div>
-                
-                <div class="card col-span-4 row-span-2"><div class="placeholder-content">Detailed Branch Analysis</div></div>
-                
-                <div class="card col-span-2"><div class="placeholder-content">Real-time Metrics Table</div></div>
-                <div class="card col-span-2"><div class="placeholder-content">Alerts/Warnings History</div></div>
+
+            <!-- Tab 1: OVERVIEW -->
+            <div id="energy-tab-overview" class="energy-subview">
+                <!-- 4 Top Badges -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+                    <div class="card" style="padding: 12px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Voltage (Avg.)</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #60a5fa; margin: 4px 0;"><i class="ph-fill ph-lightning"></i> <span id="em-avg-v">0.0 V</span></div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Min: 0.0 V  Max: 0.0 V</div>
+                    </div>
+                    <div class="card" style="padding: 12px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Current (Avg.)</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #facc15; margin: 4px 0;"><i class="ph-fill ph-wave-sine"></i> <span id="em-avg-i">0.0 A</span></div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Min: 0.0 A  Max: 0.0 A</div>
+                    </div>
+                    <div class="card" style="padding: 12px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Power (Real)</div>
+                        <div style="font-size: 18px; font-weight: 800; color: var(--primary); margin: 4px 0;"><i class="ph-fill ph-plug"></i> <span id="em-avg-p">0.00 kW</span></div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Min: 0.00 kW  Max: 0.00 kW</div>
+                    </div>
+                    <div class="card" style="padding: 12px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Energy Today</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 4px 0;"><i class="ph-fill ph-chart-bar"></i> <span id="em-today-kwh">0.0 kWh</span></div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Raw PZEM counter</div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; color: var(--text-muted); font-weight: 600; font-size: 12px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Main Branch Power Metrics (Main Panel PZEM-004T)
+                </div>
+
+                <!-- 4 Main Branch Charts -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="card">
+                        <div class="card-header"><h3>VOLTAGE</h3></div>
+                        <div style="height: 140px;"><canvas id="emOverviewVoltageChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>CURRENT</h3></div>
+                        <div style="height: 140px;"><canvas id="emOverviewCurrentChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>POWER</h3></div>
+                        <div style="height: 140px;"><canvas id="emOverviewPowerChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>POWER FACTOR</h3></div>
+                        <div style="height: 140px;"><canvas id="emOverviewPfChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: VOLTAGE PER PZEM -->
+            <div id="energy-tab-voltage" class="energy-subview" style="display: none;">
+                <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 6px; font-weight: 600; text-transform: uppercase;">Voltage History (Per Branch PZEM)</div>
+                <div class="card" style="margin-bottom: 16px;">
+                    <div class="card-header"><h3>Voltage (History)</h3></div>
+                    <div style="height: 180px;"><canvas id="emVoltagePerPzemChart"></canvas></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase;">Live Voltage Stream</div>
+                    <div style="display: flex; gap: 8px;">
+                        <select class="select-dark"><option>August</option></select>
+                        <select class="select-dark" id="em-v-branch-select" onchange="updateLivePzemChart('voltage', this.value)">
+                            <option value="1">Branch 1</option>
+                            <option value="2">Branch 2</option>
+                            <option value="3">Branch 3</option>
+                            <option value="4">Branch 4</option>
+                            <option value="5">Branch 5</option>
+                            <option value="6">Branch 6</option>
+                            <option value="7">Branch 7</option>
+                            <option value="8">Branch 8</option>
+                            <option value="9">Branch 9</option>
+                            <option value="10">Branch 10</option>
+                            <option value="main">Main Panel (PWR1)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Voltage (Today)</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #60a5fa;" id="em-live-v-val">0.0 V</div>
+                        </div>
+                    </div>
+                    <div style="height: 140px;"><canvas id="emLiveVoltageChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Tab 3: CURRENT PER PZEM -->
+            <div id="energy-tab-current" class="energy-subview" style="display: none;">
+                <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 6px; font-weight: 600; text-transform: uppercase;">Current History (Per Branch PZEM)</div>
+                <div class="card" style="margin-bottom: 16px;">
+                    <div class="card-header"><h3>Current (History)</h3></div>
+                    <div style="height: 180px;"><canvas id="emCurrentPerPzemChart"></canvas></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase;">Live Current Stream</div>
+                    <select class="select-dark" id="em-i-branch-select" onchange="updateLivePzemChart('current', this.value)">
+                        <option value="main">Main Panel (PWR1 / C0)</option>
+                        <option value="1">Branch 1 (C1)</option>
+                        <option value="2">Branch 2 (C2)</option>
+                        <option value="3">Branch 3 (C3)</option>
+                        <option value="4">Branch 4 (C4)</option>
+                        <option value="5">Branch 5 (C5)</option>
+                        <option value="6">Branch 6 (C6)</option>
+                        <option value="7">Branch 7 (C7)</option>
+                        <option value="8">Branch 8 (C8)</option>
+                        <option value="9">Branch 9 (C9)</option>
+                        <option value="10">Branch 10 (C10)</option>
+                    </select>
+                </div>
+                <div class="card">
+                    <div style="font-size: 11px; color: var(--text-muted);">Current (Today)</div>
+                    <div style="font-size: 28px; font-weight: 800; color: #facc15; margin-bottom: 10px;" id="em-live-i-val">0.0 A</div>
+                    <div style="height: 140px;"><canvas id="emLiveCurrentChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Tab 4: POWER PER PZEM -->
+            <div id="energy-tab-power" class="energy-subview" style="display: none;">
+                <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 6px; font-weight: 600; text-transform: uppercase;">Active Power History (Per Branch PZEM)</div>
+                <div class="card" style="margin-bottom: 16px;">
+                    <div class="card-header"><h3>Power (History)</h3></div>
+                    <div style="height: 180px;"><canvas id="emPowerPerPzemChart"></canvas></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase;">Live Power Stream</div>
+                    <select class="select-dark" id="em-p-branch-select" onchange="updateLivePzemChart('power', this.value)">
+                        <option value="main">Main Panel (PWR1 / C0)</option>
+                        <option value="1">Branch 1 (C1)</option>
+                        <option value="2">Branch 2 (C2)</option>
+                        <option value="3">Branch 3 (C3)</option>
+                        <option value="4">Branch 4 (C4)</option>
+                        <option value="5">Branch 5 (C5)</option>
+                        <option value="6">Branch 6 (C6)</option>
+                        <option value="7">Branch 7 (C7)</option>
+                        <option value="8">Branch 8 (C8)</option>
+                        <option value="9">Branch 9 (C9)</option>
+                        <option value="10">Branch 10 (C10)</option>
+                    </select>
+                </div>
+                <div class="card">
+                    <div style="font-size: 11px; color: var(--text-muted);">Power (Today)</div>
+                    <div style="font-size: 28px; font-weight: 800; color: var(--primary); margin-bottom: 10px;" id="em-live-p-val">0.00 kW</div>
+                    <div style="height: 140px;"><canvas id="emLivePowerChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Tab 5: PF PER PZEM -->
+            <div id="energy-tab-pf" class="energy-subview" style="display: none;">
+                <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 6px; font-weight: 600; text-transform: uppercase;">Power Factor History (Per Branch PZEM)</div>
+                <div class="card" style="margin-bottom: 16px;">
+                    <div class="card-header"><h3>Power Factor (pf) History</h3></div>
+                    <div style="height: 180px;"><canvas id="emPfPerPzemChart"></canvas></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase;">Live Power Factor Stream</div>
+                    <select class="select-dark" id="em-pf-branch-select" onchange="updateLivePzemChart('pf', this.value)">
+                        <option value="main">Main Panel (PWR1 / C0)</option>
+                        <option value="1">Branch 1 (C1)</option>
+                        <option value="2">Branch 2 (C2)</option>
+                        <option value="3">Branch 3 (C3)</option>
+                        <option value="4">Branch 4 (C4)</option>
+                        <option value="5">Branch 5 (C5)</option>
+                        <option value="6">Branch 6 (C6)</option>
+                        <option value="7">Branch 7 (C7)</option>
+                        <option value="8">Branch 8 (C8)</option>
+                        <option value="9">Branch 9 (C9)</option>
+                        <option value="10">Branch 10 (C10)</option>
+                    </select>
+                </div>
+                <div class="card">
+                    <div style="font-size: 11px; color: var(--text-muted);">Power Factor (Today)</div>
+                    <div style="font-size: 28px; font-weight: 800; color: #c084fc; margin-bottom: 10px;" id="em-live-pf-val">0.00</div>
+                    <div style="height: 140px;"><canvas id="emLivePfChart"></canvas></div>
+                </div>
             </div>
         </div>
     </template>
 
-    <template id="tpl-ai-recommendations">
-        <div class="card" style="margin: 20px; min-height: 400px;">
-            <div class="card-header">
-                <h3>AI SUGGESTIONS & ANOMALY ALERTS</h3>
+    <!-- 3. LOAD CONTROL TEMPLATE (Page 6 of PDF) -->
+    <template id="tpl-load-control">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Category Chips -->
+            <div class="category-chips">
+                <div class="category-chip">
+                    <i class="ph-fill ph-armchair"></i>
+                    <div>
+                        <div class="category-chip-title">Living Room</div>
+                        <div class="category-chip-val" id="cat-living-room">0.00 kW</div>
+                    </div>
+                </div>
+                <div class="category-chip">
+                    <i class="ph-fill ph-bed"></i>
+                    <div>
+                        <div class="category-chip-title">Bedroom</div>
+                        <div class="category-chip-val" id="cat-bedroom">0.00 kW</div>
+                    </div>
+                </div>
+                <div class="category-chip">
+                    <i class="ph-fill ph-fork-knife"></i>
+                    <div>
+                        <div class="category-chip-title">Kitchen</div>
+                        <div class="category-chip-val" id="cat-kitchen">0.00 kW</div>
+                    </div>
+                </div>
+                <div class="category-chip">
+                    <i class="ph-fill ph-snowflake"></i>
+                    <div>
+                        <div class="category-chip-title">Air Conditioner</div>
+                        <div class="category-chip-val" id="cat-ac">0.00 kW</div>
+                    </div>
+                </div>
+                <div class="category-chip">
+                    <i class="ph-fill ph-car"></i>
+                    <div>
+                        <div class="category-chip-title">Garage</div>
+                        <div class="category-chip-val" id="cat-garage">0.00 kW</div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+
+            <!-- Main Layout: Devices Table (Left) + Overrides/Schedule (Right) -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+                <!-- Left: Devices List Table -->
+                <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+                    <div style="padding: 16px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 12px; font-weight: 700; color: var(--text-muted);">DEVICES (20 CHANNELS)</h3>
+                        <span class="badge-pill badge-info" id="lc-mode-indicator">Mode: AUTO</span>
+                    </div>
+
+                    <div style="max-height: 420px; overflow-y: auto;">
+                        <table class="dark-table">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>Room</th>
+                                    <th>Power (kW)</th>
+                                    <th>Status</th>
+                                    <th>Control</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="load-control-table-body">
+                                <!-- Populated dynamically with all 20 relays -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Bottom Summary Bar -->
+                    <div style="padding: 12px 18px; background: rgba(0,0,0,0.3); border-top: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; font-size: 11px;">
+                        <div>
+                            <div style="color: var(--text-muted);">Total Connected Load</div>
+                            <div style="font-weight: 800; font-size: 14px; color: #ffffff;" id="lc-total-load">0.00 kW</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-muted);">Total Devices</div>
+                            <div style="font-weight: 800; font-size: 14px; color: #ffffff;">20</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-muted);">Devices ON</div>
+                            <div style="font-weight: 800; font-size: 14px; color: var(--primary);" id="lc-devices-on">8</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-muted);">Devices OFF</div>
+                            <div style="font-weight: 800; font-size: 14px; color: #ef4444;" id="lc-devices-off">12</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Overrides & Schedule Widgets -->
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Manual Override Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>MANUAL OVERRIDE</h3>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <span style="font-size: 12px; font-weight: 600;">Enable Manual Control</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-manual-override" onchange="toggleLoadControlMasterMode(this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Override Duration</label>
+                            <select class="select-dark" style="width: 100%;">
+                                <option>2 hours</option>
+                                <option>4 hours</option>
+                                <option>Until next schedule</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="alert('Manual Override Applied!')">APPLY</button>
+                    </div>
+
+                    <!-- Schedule Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>SCHEDULE</h3>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <span style="font-size: 12px; font-weight: 600;">Enable Schedule</span>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <button class="btn btn-outline" style="width: 100%;" onclick="alert('Schedule Configuration Opened')">View / Edit Schedule</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 4. AI RECOMMENDATIONS TEMPLATE (Page 6 & 7 of PDF) -->
+    <template id="tpl-ai-recommendations">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="sub-tabs-container">
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" onclick="switchAiTab('recommendations')">Recommendations</button>
+                    <button class="sub-tab-btn" onclick="switchAiTab('insights')">Insights</button>
+                </div>
+            </div>
+
+            <!-- Tab 1: Recommendations List -->
+            <div id="ai-tab-recommendations">
+                <div class="card" style="padding: 0; overflow: hidden;">
+                    <table class="dark-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60%;">Recommendation</th>
+                                <th style="width: 20%;">Priority</th>
+                                <th style="width: 20%; text-align: right; padding-right: 20px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ai-recommendations-table-body">
+                            <tr>
+                                <td colspan="3" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                                    <i class="ph ph-sparkle" style="font-size: 32px; color: var(--primary); margin-bottom: 10px; display: block;"></i>
+                                    <div style="font-weight: 600; color: #ffffff; font-size: 14px; margin-bottom: 4px;">No Pending AI Recommendations</div>
+                                    <div style="font-size: 11px;">System will generate optimization insights once multi-branch sensor monitoring is operational.</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 2: Insights Detail -->
+            <div id="ai-tab-insights" style="display: none;">
+                <div class="card" style="padding: 24px;">
+                    <h3 style="margin-bottom: 12px;">DETAILED AI INSIGHTS & SAVINGS REPORT</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; line-height: 1.6;">
+                        Our Gemini AI model analyzes multi-branch electrical data to detect standby power leakage and reactive losses. Insights and savings calculations will begin accumulating once all branch sensors are operational.
+                    </p>
+                    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
+                            <div style="font-size: 11px; color: var(--text-muted);">Estimated Monthly Savings</div>
+                            <div style="font-size: 20px; font-weight: 800; color: var(--primary); margin-top: 4px;">₱ 0.00</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
+                            <div style="font-size: 11px; color: var(--text-muted);">Active Anomaly Rules</div>
+                            <div style="font-size: 20px; font-weight: 800; color: #60a5fa; margin-top: 4px;">0 / 5 Rules Active</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
+                            <div style="font-size: 11px; color: var(--text-muted);">System Health</div>
+                            <div style="font-size: 20px; font-weight: 800; color: #4ade80; margin-top: 4px;">Standby</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 5. ALERTS & NOTIFICATIONS TEMPLATE (Page 7 of PDF) -->
+    <template id="tpl-alerts">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="sub-tabs-container">
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active">Active Alerts (0)</button>
+                    <button class="sub-tab-btn">Alert History</button>
+                    <button class="sub-tab-btn">Notifications</button>
+                </div>
+            </div>
+
+            <!-- Alerts Table -->
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <table class="dark-table">
                     <thead>
-                        <tr style="border-bottom: 1px solid var(--border-color);">
-                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Timestamp</th>
-                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">AI Suggestion</th>
-                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Confidence</th>
-                            <th style="padding: 12px; font-weight: 600; color: var(--text-muted);">Action</th>
+                        <tr>
+                            <th>Alert / Notifications</th>
+                            <th>Severity</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th style="text-align: right; padding-right: 20px;">Action</th>
                         </tr>
                     </thead>
-                    <tbody id="ai-suggestions-list">
-                        <!-- Populated via JS -->
+                    <tbody id="alerts-table-body">
                         <tr>
-                            <td colspan="4" style="padding: 20px; text-align: center; color: var(--text-muted);">
-                                Loading suggestions...
+                            <td colspan="5" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                                <i class="ph ph-check-circle" style="font-size: 32px; color: var(--primary); margin-bottom: 10px; display: block;"></i>
+                                <div style="font-weight: 600; color: #ffffff; font-size: 14px; margin-bottom: 4px;">No Active Alerts</div>
+                                <div style="font-size: 11px;">All electrical branches and voltage levels are operating within safe parameters.</div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+
+            <!-- Bottom Notification Settings Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>NOTIFICATION SETTINGS</h3>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0;">
+                    <div style="display: flex; gap: 40px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 12px;">Email Notifications</span>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 12px;">Push Notifications</span>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 12px;">SMS Notifications</span>
+                            <label class="switch">
+                                <input type="checkbox">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline" onclick="alert('Threshold dialog opened')">Alert Thresholds</button>
+                </div>
+            </div>
         </div>
     </template>
 
+    <!-- 6. SETTINGS TEMPLATE (Page 8 of PDF) -->
     <template id="tpl-settings">
-        <div class="tab-container">
-            <div class="tabs-header">
-                <div class="tabs">
-                    <button class="tab active">General</button>
-                    <button class="tab">PFC Settings</button>
-                    <button class="tab">Users</button>
-                    <button class="tab">Systems</button>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="sub-tabs-container">
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active">General</button>
+                    <button class="sub-tab-btn">Users</button>
                 </div>
             </div>
-            
-            <div class="settings-layout">
-                <div class="settings-panel">
-                    <h3 class="panel-title">SYSTEM SETTINGS</h3>
-                    
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <!-- Left: System Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>SYSTEM SETTINGS</h3>
+                    </div>
                     <div class="form-group">
                         <label>System Name</label>
-                        <input type="text" value="REMS" class="form-control">
+                        <input type="text" class="form-control" value="REMS">
                     </div>
-                    
                     <div class="form-group">
                         <label>Location</label>
-                        <input type="text" value="Rojas Residence" class="form-control">
+                        <input type="text" class="form-control" value="Rojas Residence">
                     </div>
-                    
                     <div class="form-group">
                         <label>Time Zone</label>
-                        <select class="form-control">
+                        <select class="select-dark" style="width: 100%;">
                             <option>(GMT+08:00) Asia, Philippines</option>
                         </select>
                     </div>
-                    
-                    <div class="form-group date-time-sync">
-                        <div>
-                            <label>Date & Time</label>
-                            <div class="current-dt">August 7, 2026 4:04 PM</div>
+                    <div class="form-group">
+                        <label>Date & Time</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" class="form-control" value="August 7, 2026  4:04 PM" readonly>
+                            <button class="btn btn-outline" style="flex-shrink: 0;" onclick="alert('RTC Time Synchronized via I2C DS3231!')">Sync</button>
                         </div>
-                        <button class="btn btn-secondary">Sync</button>
                     </div>
-                    
-                    <div class="form-actions right">
-                        <button class="btn btn-primary">SAVE CHANGES</button>
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button class="btn btn-primary" onclick="alert('System Settings Saved!')">SAVE CHANGES</button>
                     </div>
                 </div>
-                
-                <div class="settings-panel">
-                    <h3 class="panel-title">PFC SETTINGS (AUTO-CORRECTION)</h3>
-                    
+
+                <!-- Right: PFC Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>PFC SETTINGS (AUTO-CORRECTION)</h3>
+                    </div>
                     <div class="form-group">
                         <label>Target Power Factor</label>
-                        <input type="text" value="0.95" class="form-control">
+                        <input type="text" class="form-control" value="0.97">
                     </div>
-                    
                     <div class="form-group">
                         <label>Minimum PF Limit</label>
-                        <input type="text" value="0.90" class="form-control">
+                        <input type="text" class="form-control" value="0.84">
                     </div>
-                    
                     <div class="form-group">
                         <label>Capacitor Switching Delay</label>
-                        <input type="text" value="30 sec" class="form-control">
+                        <input type="text" class="form-control" value="30 sec">
                     </div>
-                    
-                    <div class="form-group">
-                        <label>Reconnection Delay</label>
-                        <input type="text" value="60 sec" class="form-control">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Capacitor Bank Sequence</label>
-                        <input type="text" value="C1 → C2 → C3" class="form-control">
-                    </div>
-                    
-                    <div class="form-actions right">
-                        <button class="btn btn-primary">SAVE CHANGES</button>
+                    <div style="margin-top: 60px; text-align: right;">
+                        <button class="btn btn-primary" onclick="alert('PFC Settings Saved!')">SAVE CHANGES</button>
                     </div>
                 </div>
             </div>
         </div>
     </template>
 
-    <!-- Generic Template for other pages -->
-    <template id="tpl-generic">
-        <div class="generic-placeholder">
-            <i class="ph ph-wrench title-icon"></i>
-            <h2>Page Under Construction</h2>
-            <p>This module is currently being developed.</p>
+    <!-- 7. ABOUT SYSTEM TEMPLATE -->
+    <template id="tpl-about">
+        <div class="card" style="padding: 24px;">
+            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">REMS - AI-Assisted Residential Energy Management Control System</h2>
+            <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px;">
+                Designed and developed for thesis compliance with complete real-time branch energy monitoring, automated power factor correction, presence-based adaptive load actuation, and Gemini AI energy optimization.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 12px;">
+                <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
+                    <strong style="color: #ffffff;">Hardware Architecture:</strong>
+                    <ul style="margin-top: 8px; margin-left: 18px; color: var(--text-muted); line-height: 1.6;">
+                        <li>Master Controller: Raspberry Pi 5 (RP1 GPIO + I2C/UART)</li>
+                        <li>Sub-Controller: ESP32 with 16-Channel MUX</li>
+                        <li>Power Monitors: 11x PZEM-004T AC Power Monitors</li>
+                        <li>Actuators: 20x 1-Channel Relay Modules (Active-Low)</li>
+                        <li>Sensors: DS3231 RTC, RCWL-0516 Radar, HLK-LD2410B, HC-SR501</li>
+                    </ul>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
+                    <strong style="color: #ffffff;">Software Stack:</strong>
+                    <ul style="margin-top: 8px; margin-left: 18px; color: var(--text-muted); line-height: 1.6;">
+                        <li>Backend: Python 3 Flask, SQLite3, gpiozero (rpi-lgpio)</li>
+                        <li>AI Engine: Google Gemini 3.6 Flash Optimization Loop</li>
+                        <li>Frontend: HTML5, CSS3 Custom Theme, Chart.js, Phosphor Icons</li>
+                        <li>Display Mode: Chromium Kiosk Mode (1024x600 Scaled)</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </template>
 
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <!-- Edit Device Modal -->
+    <div class="modal-overlay" id="modal-edit-device">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-edit-title">Edit Device Settings</h3>
+                <button class="btn-icon-rename" onclick="closeEditDeviceModal()"><i class="ph ph-x" style="font-size: 16px;"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-device-id">
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase;">Device Name</label>
+                    <input type="text" id="edit-device-name" class="form-control" placeholder="e.g. Living Room Chandelier">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase;">Dedicated Room</label>
+                    <select id="edit-device-room" class="form-control" style="cursor: pointer;">
+                        <option value="Living Room">Living Room</option>
+                        <option value="Master Bedroom">Master Bedroom</option>
+                        <option value="Bedroom 2">Bedroom 2</option>
+                        <option value="Kitchen">Kitchen</option>
+                        <option value="Dining Room">Dining Room</option>
+                        <option value="Bathroom">Bathroom</option>
+                        <option value="Garage">Garage</option>
+                        <option value="Outdoor / Garden">Outdoor / Garden</option>
+                        <option value="Hallway">Hallway</option>
+                        <option value="Laundry Area">Laundry Area</option>
+                        <option value="Main Panel">Main Panel (PFC)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" style="padding: 6px 14px; font-size: 12px;" onclick="closeEditDeviceModal()">Cancel</button>
+                <button class="btn btn-primary" style="padding: 6px 16px; font-size: 12px;" onclick="submitEditDeviceModal()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JavaScript Logic -->
+    <script src="{{ url_for('static', filename='app.js') }}?v=21"></script>
 </body>
 </html>
