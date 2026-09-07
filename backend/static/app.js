@@ -153,9 +153,27 @@ function initLoadControlTable() {
     tbody.innerHTML = '';
     DEVICE_MAPPING.forEach(dev => {
         const isChecked = currentRelayStates[dev.id] === 'ON';
+        const isProtected = [1, 2, 3, 10, 18].includes(dev.id);
         const roomOptionsHtml = DEDICATED_ROOMS.map(r => 
             `<option value="${r}" ${dev.room === r ? 'selected' : ''}>${r}</option>`
         ).join('');
+
+        let sensorLinkHtml = '';
+        if (isProtected) {
+            sensorLinkHtml = `<span style="font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 4px;" title="Protected from motion sensor">Protected</span>`;
+        } else {
+            sensorLinkHtml = `
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label class="switch" title="Link to HLK-LD2410B presence sensor">
+                        <input type="checkbox" id="sensor-link-${dev.id}" ${dev.sensor_linked ? 'checked' : ''} onchange="toggleSensorLink(${dev.id}, this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-size: 10px; font-weight: 700; color: ${dev.sensor_linked ? 'var(--primary)' : 'var(--text-muted)'};" id="sensor-link-label-${dev.id}">
+                        ${dev.sensor_linked ? 'LINKED' : 'OFF'}
+                    </span>
+                </div>
+            `;
+        }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -179,6 +197,9 @@ function initLoadControlTable() {
                 <span id="stat-text-relay-${dev.id}" style="font-weight: 700; color: ${isChecked ? 'var(--primary)' : 'var(--text-muted)'};">
                     ${isChecked ? 'ON' : 'OFF'}
                 </span>
+            </td>
+            <td>
+                ${sensorLinkHtml}
             </td>
             <td>
                 <label class="switch">
@@ -206,6 +227,33 @@ function initLoadControlTable() {
     }
 }
 
+// Toggle Sensor Link directly from table
+window.toggleSensorLink = async function(deviceId, isLinked) {
+    const dev = DEVICE_MAPPING.find(d => d.id === deviceId);
+    if (dev) dev.sensor_linked = isLinked;
+    
+    const labelEl = document.getElementById(`sensor-link-label-${deviceId}`);
+    if (labelEl) {
+        labelEl.textContent = isLinked ? 'LINKED' : 'OFF';
+        labelEl.style.color = isLinked ? 'var(--primary)' : 'var(--text-muted)';
+    }
+
+    try {
+        const res = await fetch('/api/devices/toggle-sensor-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: deviceId, linked: isLinked })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.message || "Failed to update sensor link");
+            initLoadControlTable();
+        }
+    } catch (e) {
+        console.error("Failed to toggle sensor link:", e);
+    }
+};
+
 // Handler when Room is changed directly via dropdown
 window.onDeviceRoomChanged = async function(deviceId, newRoom) {
     const dev = DEVICE_MAPPING.find(d => d.id === deviceId);
@@ -232,6 +280,18 @@ window.openEditDeviceModal = function(deviceId) {
     document.getElementById('edit-device-name').value = dev.name;
     document.getElementById('edit-device-room').value = dev.room;
     document.getElementById('modal-edit-title').textContent = `Edit Device: Relay ${dev.id} (${dev.pin})`;
+    
+    // Sensor link container in modal
+    const isProtected = [1, 2, 3, 10, 18].includes(dev.id);
+    const linkContainer = document.getElementById('modal-sensor-link-container');
+    const linkCheckbox = document.getElementById('edit-device-sensor-link');
+    if (linkContainer) {
+        linkContainer.style.display = isProtected ? 'none' : 'flex';
+    }
+    if (linkCheckbox) {
+        linkCheckbox.checked = !!dev.sensor_linked;
+    }
+
     document.getElementById('modal-edit-device').classList.add('open');
 };
 
@@ -244,6 +304,8 @@ window.submitEditDeviceModal = async function() {
     const id = parseInt(document.getElementById('edit-device-id').value);
     const name = document.getElementById('edit-device-name').value.trim();
     const room = document.getElementById('edit-device-room').value;
+    const isProtected = [1, 2, 3, 10, 18].includes(id);
+    const sensorLinked = isProtected ? false : (document.getElementById('edit-device-sensor-link')?.checked ?? false);
     
     if (!name) {
         alert("Please enter a valid device name.");
@@ -254,6 +316,7 @@ window.submitEditDeviceModal = async function() {
     if (dev) {
         dev.name = name;
         dev.room = room;
+        dev.sensor_linked = sensorLinked;
     }
     
     // Update DOM elements in the table
@@ -262,6 +325,14 @@ window.submitEditDeviceModal = async function() {
     
     const roomSelect = document.getElementById(`select-room-${id}`);
     if (roomSelect) roomSelect.value = room;
+
+    const sensorSwitch = document.getElementById(`sensor-link-${id}`);
+    if (sensorSwitch) sensorSwitch.checked = sensorLinked;
+    const sensorLabel = document.getElementById(`sensor-link-label-${id}`);
+    if (sensorLabel) {
+        sensorLabel.textContent = sensorLinked ? 'LINKED' : 'OFF';
+        sensorLabel.style.color = sensorLinked ? 'var(--primary)' : 'var(--text-muted)';
+    }
     
     closeEditDeviceModal();
     
@@ -269,7 +340,7 @@ window.submitEditDeviceModal = async function() {
         await fetch('/api/devices/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id, name: name, room: room })
+            body: JSON.stringify({ id: id, name: name, room: room, sensor_linked: sensorLinked })
         });
     } catch (e) {
         console.error("Failed to save device update:", e);
@@ -510,6 +581,23 @@ setInterval(async () => {
                         hlkBadge.style.color = '#cbd5e1';
                     }
                     if (hlkTimer) hlkTimer.textContent = `No presence detected for ${occ.vacancy_seconds || 0}s`;
+                }
+
+                // Dynamically display which loads are linked to the presence sensor
+                if (data.sensor_linked_relays) {
+                    const autoStatusEl = document.getElementById('hlk-auto-status');
+                    if (autoStatusEl) {
+                        const count = data.sensor_linked_relays.length;
+                        if (count === 1) {
+                            const dev = DEVICE_MAPPING.find(d => d.id === data.sensor_linked_relays[0]);
+                            const dName = dev ? dev.name : `Relay #${data.sensor_linked_relays[0]}`;
+                            autoStatusEl.textContent = `Auto-Controls: ${dName}`;
+                        } else if (count > 1) {
+                            autoStatusEl.textContent = `Auto-Controls: ${count} Loads (#${data.sensor_linked_relays.join(', #')})`;
+                        } else {
+                            autoStatusEl.textContent = `Auto-Controls: None (Set in Load Control)`;
+                        }
+                    }
                 }
             }
 

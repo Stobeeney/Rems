@@ -674,6 +674,7 @@
                                     <th>Room</th>
                                     <th>Power (kW)</th>
                                     <th>Status</th>
+                                    <th>Sensor Link</th>
                                     <th>Control</th>
                                     <th></th>
                                 </tr>
@@ -1006,6 +1007,18 @@
                         <option value="Main Panel">Main Panel (PFC)</option>
                     </select>
                 </div>
+                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;" id="modal-sensor-link-container">
+                    <div>
+                        <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
+                            <i class="ph-fill ph-radar" style="color: var(--primary);"></i> HLK-LD2410B Presence Link
+                        </div>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Awtomatikong mag-o-ON kapag may na-detect na tao</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="edit-device-sensor-link">
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" style="padding: 6px 14px; font-size: 12px;" onclick="closeEditDeviceModal()">Cancel</button>
@@ -1015,6 +1028,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=21"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=23"></script>
 </body>
 </html>

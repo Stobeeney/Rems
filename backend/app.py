@@ -115,9 +115,24 @@ def init_db():
             name TEXT NOT NULL,
             room TEXT NOT NULL,
             pin_desc TEXT,
-            power REAL DEFAULT 0.00
+            power REAL DEFAULT 0.00,
+            sensor_linked INTEGER DEFAULT 0
         )
     ''')
+    try:
+        c.execute("ALTER TABLE devices ADD COLUMN sensor_linked INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
+
+    # Ensure default Relay 4 has sensor_linked=1 if none is set
+    try:
+        c.execute("SELECT COUNT(*) FROM devices WHERE sensor_linked = 1")
+        if c.fetchone()[0] == 0:
+            c.execute("UPDATE devices SET sensor_linked = 1 WHERE id = 4")
+            conn.commit()
+    except Exception:
+        pass
     c.execute('''
         CREATE TABLE IF NOT EXISTS energy_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -346,15 +361,34 @@ def relay_status_get():
         "relays": formatted_status
     })
 
+def get_sensor_linked_relays():
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT id FROM devices WHERE sensor_linked = 1")
+        rows = c.fetchall()
+        conn.close()
+        linked = [r[0] for r in rows]
+        return linked if linked else [4]
+    except Exception:
+        return [4]
+
 @app.route('/api/devices', methods=['GET'])
 def get_devices():
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        c.execute("SELECT id, name, room, pin_desc, power FROM devices ORDER BY id ASC")
+        c.execute("SELECT id, name, room, pin_desc, power, sensor_linked FROM devices ORDER BY id ASC")
         rows = c.fetchall()
         conn.close()
-        devices = [{"id": r[0], "name": r[1], "room": r[2], "pin": r[3], "power": r[4]} for r in rows]
+        devices = [{
+            "id": r[0], 
+            "name": r[1], 
+            "room": r[2], 
+            "pin": r[3], 
+            "power": r[4],
+            "sensor_linked": bool(r[5])
+        } for r in rows]
         return jsonify({"success": True, "devices": devices})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -366,6 +400,7 @@ def update_device():
         dev_id = data.get('id')
         name = data.get('name')
         room = data.get('room')
+        sensor_linked = data.get('sensor_linked')
         if not dev_id:
             return jsonify({"success": False, "message": "Missing device ID"}), 400
         
@@ -377,10 +412,41 @@ def update_device():
             c.execute("UPDATE devices SET name = ? WHERE id = ?", (name.strip(), dev_id))
         elif room:
             c.execute("UPDATE devices SET room = ? WHERE id = ?", (room.strip(), dev_id))
+            
+        if sensor_linked is not None:
+            c.execute("UPDATE devices SET sensor_linked = ? WHERE id = ?", (1 if sensor_linked else 0, dev_id))
+            
         conn.commit()
         conn.close()
-        print(f"✏️ Updated Device {dev_id}: Name='{name}', Room='{room}'")
+        print(f"✏️ Updated Device {dev_id}: Name='{name}', Room='{room}', SensorLinked={sensor_linked}")
         return jsonify({"success": True, "message": f"Device {dev_id} updated successfully"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/devices/toggle-sensor-link', methods=['POST'])
+def toggle_device_sensor_link():
+    """Dynamically links or unlinks a specific relay to the HLK-LD2410B presence sensor"""
+    try:
+        data = request.get_json() or {}
+        dev_id = int(data.get('id', 0))
+        linked = bool(data.get('linked', False))
+        if dev_id < 1 or dev_id > 20:
+            return jsonify({"success": False, "message": "Invalid device ID"}), 400
+        
+        # Disallow linking PFC banks (Relays 1-3) and Critical Loads (10 Ref, 18 CCTV)
+        if dev_id in [1, 2, 3]:
+            return jsonify({"success": False, "message": "Cannot link PFC Capacitor Banks to motion sensor."}), 400
+        if dev_id in [10, 18]:
+            return jsonify({"success": False, "message": "Cannot link Critical Loads (Refrigerator/CCTV) to motion sensor."}), 400
+
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("UPDATE devices SET sensor_linked = ? WHERE id = ?", (1 if linked else 0, dev_id))
+        conn.commit()
+        conn.close()
+        linked_relays = get_sensor_linked_relays()
+        print(f"📡 Device {dev_id} sensor_linked set to {linked}. Current linked relays: {linked_relays}")
+        return jsonify({"success": True, "id": dev_id, "sensor_linked": linked, "linked_relays": linked_relays})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -507,6 +573,7 @@ def send_data_to_frontend():
     resp["system_mode"] = system_mode
     resp["pfc_auto"] = pfc_auto_mode
     resp["load_auto"] = load_auto_mode
+    resp["sensor_linked_relays"] = get_sensor_linked_relays()
     resp["relays"] = {str(k): ("ON" if v else "OFF") for k, v in relay_status.items()}
     return jsonify(resp), 200
 
@@ -725,33 +792,39 @@ def occupancy_engine():
                 occupancy_state["vacancy_seconds"] = 0
                 occupancy_state["status"] = "OCCUPIED"
                 
-                # In AI-Assisted Mode: Auto-turn ON Relay 4 (Living Room Lights)
+                # In AI-Assisted Mode: Auto-turn ON all sensor-linked relays
                 if system_mode == 'AI_ASSISTED':
-                    if not relay_status.get(4, False) and relays.get(4):
-                        relays[4].on()
-                        relay_status[4] = True
-                        print("🤖 [AI-Assisted]: HLK mmWave detected presence. Turned ON Living Room Lights.")
+                    linked_relays = get_sensor_linked_relays()
+                    for r_id in linked_relays:
+                        if not relay_status.get(r_id, False) and relays.get(r_id):
+                            relays[r_id].on()
+                            relay_status[r_id] = True
+                            print(f"🤖 [AI-Assisted]: HLK mmWave detected presence. Turned ON Relay {r_id}.")
             else:
                 elapsed = int(now - occupancy_state.get("last_motion_time", now))
                 occupancy_state["vacancy_seconds"] = elapsed
                 if elapsed > 15:
                     occupancy_state["status"] = "VACANT"
                     
-                # In AI-Assisted Mode: Auto-turn OFF lights after 5 minutes (300s) vacancy
+                # In AI-Assisted Mode: Auto-turn OFF all sensor-linked relays after 5 minutes (300s) vacancy
                 if system_mode == 'AI_ASSISTED' and elapsed >= 300:
-                    if relay_status.get(4, False) and relays.get(4):
-                        relays[4].off()
-                        relay_status[4] = False
-                        print("🤖 [AI-Assisted]: Vacancy timeout (5m). Turned OFF Living Room Lights.")
+                    linked_relays = get_sensor_linked_relays()
+                    for r_id in linked_relays:
+                        if relay_status.get(r_id, False) and relays.get(r_id):
+                            relays[r_id].off()
+                            relay_status[r_id] = False
+                            print(f"🤖 [AI-Assisted]: Vacancy timeout (5m). Turned OFF Relay {r_id}.")
                         
                 # In Manual Mode: Generate notification suggestion once vacant
                 elif system_mode == 'MANUAL' and elapsed == 300:
-                    if relay_status.get(4, False):
+                    linked_relays = get_sensor_linked_relays()
+                    any_linked_on = any(relay_status.get(r, False) for r in linked_relays)
+                    if any_linked_on:
                         conn = sqlite3.connect(DB_FILE)
                         c = conn.cursor()
                         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         c.execute("INSERT INTO suggestions (message, confidence, timestamp) VALUES (?, ?, ?)",
-                                  ("No human presence detected for 5 minutes. Turn OFF Living Room Lights?", "High (95%)", now_str))
+                                  (f"No human presence detected for 5 minutes. Turn OFF motion-linked loads {linked_relays}?", "High (95%)", now_str))
                         conn.commit()
                         conn.close()
         except Exception:
