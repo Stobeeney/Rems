@@ -806,17 +806,17 @@ def occupancy_engine():
                 if elapsed > 15:
                     occupancy_state["status"] = "VACANT"
                     
-                # In AI-Assisted Mode: Auto-turn OFF all sensor-linked relays after 5 minutes (300s) vacancy
-                if system_mode == 'AI_ASSISTED' and elapsed >= 300:
+                # In AI-Assisted Mode: Auto-turn OFF all sensor-linked relays after 2 minutes (120s) vacancy
+                if system_mode == 'AI_ASSISTED' and elapsed >= 120:
                     linked_relays = get_sensor_linked_relays()
                     for r_id in linked_relays:
                         if relay_status.get(r_id, False) and relays.get(r_id):
                             relays[r_id].off()
                             relay_status[r_id] = False
-                            print(f"🤖 [AI-Assisted]: Vacancy timeout (5m). Turned OFF Relay {r_id}.")
+                            print(f"🤖 [AI-Assisted]: Vacancy timeout (2 mins reached). Turned OFF Relay {r_id}.")
                         
                 # In Manual Mode: Generate notification suggestion once vacant
-                elif system_mode == 'MANUAL' and elapsed == 300:
+                elif system_mode == 'MANUAL' and elapsed == 120:
                     linked_relays = get_sensor_linked_relays()
                     any_linked_on = any(relay_status.get(r, False) for r in linked_relays)
                     if any_linked_on:
@@ -824,7 +824,7 @@ def occupancy_engine():
                         c = conn.cursor()
                         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         c.execute("INSERT INTO suggestions (message, confidence, timestamp) VALUES (?, ?, ?)",
-                                  (f"No human presence detected for 5 minutes. Turn OFF motion-linked loads {linked_relays}?", "High (95%)", now_str))
+                                  (f"No human presence detected for 2 minutes. Turn OFF motion-linked loads {linked_relays}?", "High (95%)", now_str))
                         conn.commit()
                         conn.close()
         except Exception:
