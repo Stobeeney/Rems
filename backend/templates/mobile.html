@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e17">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>REMS Mobile - Energy Management</title>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Mobile Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=1">
+</head>
+<body>
+
+    <!-- Sticky Mobile Header -->
+    <header class="mobile-header">
+        <div class="brand-wrapper">
+            <div class="brand-logo-badge">
+                <i class="ph-fill ph-lightning"></i>
+            </div>
+            <div class="brand-info">
+                <h1>REMS <span>IoT</span></h1>
+                <p id="m-current-time">Connecting...</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="status-badge" id="sys-status-badge">
+                <span class="ping-dot"></span>
+                <span id="sys-status-label">ONLINE</span>
+            </div>
+            <button class="emergency-btn" onclick="emergencyCutoff()" title="Emergency Cut-Off">
+                <i class="ph-fill ph-power"></i>
+                <span>STOP</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Mobile Content Area -->
+    <main class="mobile-content">
+
+        <!-- TAB 1: OVERVIEW -->
+        <section class="tab-pane active" id="tab-overview">
+            <!-- Hero Metric: Total Power -->
+            <div class="m-card hero-meter-card">
+                <div class="m-card-header" style="margin-bottom:0;">
+                    <span class="m-card-title">
+                        <i class="ph-fill ph-gauge"></i>
+                        Active Grid Power
+                    </span>
+                    <span style="font-size: 11px; color: var(--primary); font-weight:700;">MAIN C0</span>
+                </div>
+                <div class="hero-metric-main">
+                    <span class="hero-val" id="hero-power-val">0.0</span>
+                    <span class="hero-unit">W</span>
+                    <div class="hero-label">Real-time Residential Load</div>
+                </div>
+            </div>
+
+            <!-- 2x2 Electrical Metrics Grid -->
+            <div class="metrics-grid-2x2">
+                <div class="metric-sub-card">
+                    <div class="sub-label">
+                        <i class="ph ph-wave-sine" style="color:var(--accent-cyan);"></i> Voltage
+                    </div>
+                    <div class="sub-val cyan" id="metric-volt-val">0.0 V</div>
+                </div>
+                <div class="metric-sub-card">
+                    <div class="sub-label">
+                        <i class="ph ph-arrows-left-right" style="color:var(--accent-amber);"></i> Current
+                    </div>
+                    <div class="sub-val amber" id="metric-curr-val">0.00 A</div>
+                </div>
+                <div class="metric-sub-card">
+                    <div class="sub-label">
+                        <i class="ph ph-battery-charging" style="color:var(--primary);"></i> Energy
+                    </div>
+                    <div class="sub-val emerald" id="metric-energy-val">0.00 kWh</div>
+                </div>
+                <div class="metric-sub-card">
+                    <div class="sub-label">
+                        <i class="ph ph-chart-line-up" style="color:var(--accent-blue);"></i> Power Factor
+                    </div>
+                    <div class="sub-val blue" id="metric-pf-val">0.00</div>
+                </div>
+            </div>
+
+            <!-- Quick Modes Banner -->
+            <div class="m-card" style="margin-top: 12px;">
+                <div class="m-card-header">
+                    <span class="m-card-title"><i class="ph ph-cpu"></i> Automation Status</span>
+                    <span style="font-size:11px; color:var(--text-muted);">Tap to switch</span>
+                </div>
+                <div class="mode-toggle-bar">
+                    <div class="mode-badge-btn active-auto" id="mode-btn-pfc" onclick="toggleMode('pfc')">
+                        <span class="m-label">PFC Capacitors</span>
+                        <span class="m-status" id="mode-status-pfc">AUTO</span>
+                    </div>
+                    <div class="mode-badge-btn active-auto" id="mode-btn-load" onclick="toggleMode('load')">
+                        <span class="m-label">Load Shedding</span>
+                        <span class="m-status" id="mode-status-load">AUTO</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: PZEM BRANCHES (11 Channels) -->
+        <section class="tab-pane" id="tab-branches">
+            <div class="m-card-header" style="margin-bottom: 8px;">
+                <span class="m-card-title"><i class="ph-fill ph-squares-four"></i> 11-Channel PZEM Monitoring</span>
+                <span style="font-size:11px; color:var(--text-muted);">CD74HC4067 Multiplexer</span>
+            </div>
+            <div class="branch-grid" id="branches-list">
+                <!-- Injected via mobile.js -->
+            </div>
+        </section>
+
+        <!-- TAB 3: RELAY LOADS (20 Relays) -->
+        <section class="tab-pane" id="tab-relays">
+            <!-- Bulk Action Buttons -->
+            <div class="bulk-btn-row">
+                <button class="btn-bulk btn-on" onclick="setAllRelays(true)">
+                    <i class="ph-fill ph-check-circle"></i> Turn ALL ON
+                </button>
+                <button class="btn-bulk btn-off" onclick="setAllRelays(false)">
+                    <i class="ph-fill ph-x-circle"></i> Turn ALL OFF
+                </button>
+            </div>
+
+            <!-- Room Filter Chips -->
+            <div class="filter-scroll-wrapper" id="filter-chips-container">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- 20 Relays List -->
+            <div class="relay-list-grid" id="relay-cards-list">
+                <!-- Injected via mobile.js -->
+            </div>
+        </section>
+
+        <!-- TAB 4: AUTOMATION & AI -->
+        <section class="tab-pane" id="tab-ai">
+            <div class="m-card">
+                <div class="m-card-header">
+                    <span class="m-card-title"><i class="ph-fill ph-sliders"></i> System Automation Mode</span>
+                </div>
+                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+                    Control whether relay switching is driven by automated algorithmic thresholds or manual user override.
+                </p>
+                <div class="mode-toggle-bar">
+                    <div class="mode-badge-btn active-auto" id="mode-btn-pfc-2" onclick="toggleMode('pfc')">
+                        <span class="m-label">PFC Relay Bank (K1-K3)</span>
+                        <span class="m-status" id="mode-status-pfc-2">AUTO</span>
+                    </div>
+                    <div class="mode-badge-btn active-auto" id="mode-btn-load-2" onclick="toggleMode('load')">
+                        <span class="m-label">20-Relay Load Shedding</span>
+                        <span class="m-status" id="mode-status-load-2">AUTO</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="m-card-header" style="margin-top:14px; margin-bottom:8px;">
+                <span class="m-card-title"><i class="ph-fill ph-sparkle" style="color:var(--accent-cyan);"></i> AI Energy Advisory</span>
+                <span style="font-size:11px; color:var(--text-muted);">Gemini AI Assistant</span>
+            </div>
+            <div id="ai-suggestions-list">
+                <!-- Injected via mobile.js -->
+            </div>
+        </section>
+
+        <!-- TAB 5: SETTINGS & ABOUT -->
+        <section class="tab-pane" id="tab-settings">
+            <div class="m-card">
+                <div class="m-card-header">
+                    <span class="m-card-title"><i class="ph ph-info"></i> System Information</span>
+                </div>
+                <div style="font-size:12px; line-height:1.8; color:var(--text-secondary);">
+                    <div><strong>Project:</strong> REMS (AI-Assisted Residential Energy Management)</div>
+                    <div><strong>Host:</strong> Raspberry Pi 5 (Debian Linux ARM64)</div>
+                    <div><strong>Sensors:</strong> 11x PZEM-004T v3.0 via CD74HC4067 MUX</div>
+                    <div><strong>Actuators:</strong> 20-Channel Optocoupled Relay Board</div>
+                    <div><strong>Backend:</strong> Python Flask + SQLite3</div>
+                </div>
+            </div>
+
+            <div class="m-card" style="text-align:center;">
+                <a href="/?desktop=1" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-size:13px; font-weight:700; text-decoration:none; padding:10px 16px; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:rgba(16,185,129,0.1);">
+                    <i class="ph ph-desktop"></i> Switch to Full Desktop / Kiosk View
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Mobile Navigation Bar -->
+    <nav class="bottom-nav-bar">
+        <a class="nav-item active" data-tab="overview">
+            <i class="ph-fill ph-chart-pie-slice"></i>
+            <span>Overview</span>
+        </a>
+        <a class="nav-item" data-tab="branches">
+            <i class="ph-fill ph-squares-four"></i>
+            <span>Branches</span>
+        </a>
+        <a class="nav-item" data-tab="relays">
+            <i class="ph-fill ph-toggle-left"></i>
+            <span>Relays</span>
+        </a>
+        <a class="nav-item" data-tab="ai">
+            <i class="ph-fill ph-sparkle"></i>
+            <span>AI & Auto</span>
+        </a>
+        <a class="nav-item" data-tab="settings">
+            <i class="ph-fill ph-gear"></i>
+            <span>Settings</span>
+        </a>
+    </nav>
+
+    <!-- Mobile Scripts -->
+    <script src="{{ url_for('static', filename='mobile.js') }}?v=1"></script>
+</body>
+</html>

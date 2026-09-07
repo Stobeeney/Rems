@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 import json
-from gpiozero import OutputDevice
+from gpiozero import OutputDevice, DigitalInputDevice
 import serial
 import re
 import threading
@@ -17,18 +17,25 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Initialize 20 Relays (Active Low for most relay modules)
-# 1-3 are PFC, 4-20 are Load Control branches.
+# =============================================================================
+# 1. Hardware Actuators: 20 Relays (Active Low)
+# =============================================================================
+# Relays 1-3: PFC Capacitor Banks (K1, K2, K3) via CJX2-1210 contactors
+# Relays 4-20: Monitored Lighting, Outlets, and ACU Load Branches
 relay_pins = {
-    1: 17, 2: 27, 3: 22,
-    4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10,
-    11: 11, 12: 12, 13: 13, 14: 16, 15: 18,
-    16: 19, 17: 20, 18: 21, 19: 23, 20: 24
+    1: 17, 2: 27, 3: 22,   # PFC Capacitor Banks K1, K2, K3
+    4: 4,  5: 5,  6: 6,    # Living Room Lights, TV, Outlets Group 1
+    7: 7,  8: 8,  9: 9,    # ACU Main, Bedroom 1 Lights, Bedroom 1 Outlets
+    10: 10, 11: 11, 12: 12, # Refrigerator (Critical), Kitchen Outlets, Water Heater
+    13: 13, 14: 16, 15: 18, # Washing Machine, Microwave, Garage Door & Lights
+    16: 19, 17: 20, 18: 21, # Dining Room Lights, Outdoor Lights, CCTV/NVR (Critical)
+    19: 23, 20: 24          # Standby Outlets, Auxiliary Branch
 }
 relays = {}
 relay_status = {}
-pfc_auto_mode = False # Default to manual so user has full direct control
-load_auto_mode = False # Default to manual so user has full direct control
+pfc_auto_mode = False   # PFC automatic threshold engagement
+load_auto_mode = False  # Load control automatic engagement
+system_mode = "MANUAL"  # 3 Modes: MANUAL, AI_ASSISTED, SECURITY
 
 for r_id, pin in relay_pins.items():
     try:
@@ -38,6 +45,34 @@ for r_id, pin in relay_pins.items():
         print(f"Error initializing relay {r_id} on pin {pin}: {e}")
         relays[r_id] = None
         relay_status[r_id] = False
+
+# =============================================================================
+# 2. Hardware Sensors: Occupancy & Human Presence (Sensor Fusion)
+# =============================================================================
+# Sensor 1: RCWL-0516 (Microwave Doppler Radar) -> GPIO 14 (Pin 8)
+# Sensor 2: HLK-LD2410B (24GHz mmWave Presence OUT) -> GPIO 15 (Pin 10)
+# Sensor 3: HC-SR501 (PIR Motion Sensor) -> GPIO 25 (Pin 22)
+RCWL_PIN = 14
+MMWAVE_PIN = 15
+PIR_PIN = 25
+
+occupancy_sensors = {}
+try:
+    occupancy_sensors['rcwl'] = DigitalInputDevice(RCWL_PIN, pull_up=False)
+    occupancy_sensors['mmwave'] = DigitalInputDevice(MMWAVE_PIN, pull_up=False)
+    occupancy_sensors['pir'] = DigitalInputDevice(PIR_PIN, pull_up=False)
+    print("✅ Occupancy sensors initialized on GPIO 14, 15, 25")
+except Exception as e:
+    print(f"⚠️ Could not initialize all occupancy sensors: {e}")
+
+occupancy_state = {
+    "rcwl": False,
+    "mmwave": False,
+    "pir": False,
+    "status": "VACANT",
+    "last_motion_time": time.time(),
+    "vacancy_seconds": 0
+}
 
 app = Flask(__name__)
 # Ina-allow nito na makipag-usap ang Front-end sa Back-end
@@ -74,6 +109,28 @@ def init_db():
             room TEXT NOT NULL,
             pin_desc TEXT,
             power REAL DEFAULT 0.00
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS energy_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            channel INTEGER NOT NULL,
+            voltage REAL,
+            current REAL,
+            power REAL,
+            energy REAL,
+            power_factor REAL,
+            frequency REAL
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS system_overrides (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            source TEXT NOT NULL,
+            action TEXT NOT NULL,
+            details TEXT
         )
     ''')
     # Insert default accounts only if users table is empty
@@ -191,9 +248,22 @@ def register():
 @app.route('/')
 def home():
     """
-    Ise-serve nito ang Frontend UI (Login & Dashboard)
+    Ise-serve nito ang Frontend UI:
+    - Kung mobile phone / Android APK: ise-serve ang mobile.html
+    - Kung touchscreen kiosk / desktop: ise-serve ang index.html
     """
+    user_agent = request.headers.get('User-Agent', '').lower()
+    is_mobile = any(m in user_agent for m in ['android', 'iphone', 'ipad', 'mobile'])
+    if is_mobile and request.args.get('desktop') != '1':
+        return render_template('mobile.html')
     return render_template('index.html')
+
+@app.route('/mobile')
+def mobile():
+    """
+    Dedicated endpoint para sa Mobile UI at Android APK WebView
+    """
+    return render_template('mobile.html')
 
 @app.route('/api/relay', methods=['POST'])
 def control_relay():
@@ -292,6 +362,68 @@ def update_device():
         return jsonify({"success": True, "message": f"Device {dev_id} updated successfully"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/mode', methods=['GET', 'POST'])
+def manage_system_mode():
+    """Manages the 3 System Modes required by thesis: MANUAL, AI_ASSISTED, SECURITY"""
+    global system_mode, pfc_auto_mode, load_auto_mode
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        new_mode = data.get('mode', '').upper()
+        if new_mode in ['MANUAL', 'AI_ASSISTED', 'SECURITY']:
+            system_mode = new_mode
+            if system_mode == 'AI_ASSISTED':
+                pfc_auto_mode = True
+                load_auto_mode = True
+                print("🤖 Switched to AI-ASSISTED MODE: Automation enabled.")
+            elif system_mode == 'MANUAL':
+                pfc_auto_mode = False
+                load_auto_mode = False
+                print("👤 Switched to MANUAL MODE: Automation paused.")
+            elif system_mode == 'SECURITY':
+                pfc_auto_mode = False
+                load_auto_mode = False
+                # Cut off non-critical convenience outlets; Keep critical (10=Ref, 18=CCTV) ON
+                for r_id in range(4, 21):
+                    if r_id not in [10, 18] and relays.get(r_id):
+                        relays[r_id].off()
+                        relay_status[r_id] = False
+                print("🔒 Switched to SECURITY MODE: Non-critical outlets cut off. Critical loads preserved.")
+            return jsonify({"success": True, "mode": system_mode})
+        return jsonify({"success": False, "message": "Invalid mode. Choose MANUAL, AI_ASSISTED, or SECURITY"}), 400
+    return jsonify({
+        "success": True, 
+        "mode": system_mode,
+        "pfc_auto": pfc_auto_mode,
+        "load_auto": load_auto_mode
+    })
+
+@app.route('/api/occupancy', methods=['GET'])
+def get_occupancy_state():
+    """Returns multi-sensor fusion occupancy status (RCWL-0516, HLK-LD2410B, HC-SR501)"""
+    return jsonify(occupancy_state), 200
+
+@app.route('/api/active-devices', methods=['GET'])
+def get_active_devices():
+    """Feature: 'Ano mga nakabukas' - Returns list of all currently powered ON devices"""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT id, name, room, pin_desc, power FROM devices ORDER BY id ASC")
+    rows = c.fetchall()
+    conn.close()
+    active = []
+    for r in rows:
+        dev_id = r[0]
+        if relay_status.get(dev_id, False):
+            active.append({
+                "id": dev_id,
+                "name": r[1],
+                "room": r[2],
+                "pin": r[3],
+                "power": r[4],
+                "status": "ON"
+            })
+    return jsonify({"success": True, "count": len(active), "devices": active}), 200
 
 @app.route('/api/data', methods=['POST'])
 def receive_data_from_esp32():
@@ -527,12 +659,147 @@ def esp32_serial_worker():
                 pass
             time.sleep(1)
 
-# Start background threads
-# anomaly_thread = threading.Thread(target=ai_anomaly_engine, daemon=True)
-# anomaly_thread.start()  # Paused: Will only trigger once multiplexer & real sensors are online!
+# =============================================================================
+# 4. Automation Engines: Occupancy Fusion, PFC Loop, & 5-min Energy Logger
+# =============================================================================
 
+def occupancy_fusion_engine():
+    """Background engine that fuses RCWL-0516, HLK-LD2410B, and HC-SR501 inputs"""
+    global occupancy_state
+    while True:
+        try:
+            r_val = bool(occupancy_sensors['rcwl'].value) if 'rcwl' in occupancy_sensors else False
+            m_val = bool(occupancy_sensors['mmwave'].value) if 'mmwave' in occupancy_sensors else False
+            p_val = bool(occupancy_sensors['pir'].value) if 'pir' in occupancy_sensors else False
+            
+            motion_active = (r_val or m_val or p_val)
+            now = time.time()
+            if motion_active:
+                occupancy_state["last_motion_time"] = now
+                occupancy_state["vacancy_seconds"] = 0
+                occupancy_state["status"] = "OCCUPIED"
+                
+                # In AI-Assisted Mode: Auto-turn ON designated lighting (Relay 4 / Living Room Lights)
+                if system_mode == 'AI_ASSISTED':
+                    if not relay_status.get(4, False) and relays.get(4):
+                        relays[4].on()
+                        relay_status[4] = True
+                        print("🤖 [AI-Assisted]: Motion verified. Automatically turned ON Living Room Lights.")
+            else:
+                elapsed = int(now - occupancy_state.get("last_motion_time", now))
+                occupancy_state["vacancy_seconds"] = elapsed
+                if elapsed > 15:
+                    occupancy_state["status"] = "VACANT"
+                    
+                # In AI-Assisted Mode: Auto-turn OFF lights after 5 minutes (300s) vacancy
+                if system_mode == 'AI_ASSISTED' and elapsed >= 300:
+                    if relay_status.get(4, False) and relays.get(4):
+                        relays[4].off()
+                        relay_status[4] = False
+                        print("🤖 [AI-Assisted]: Vacancy timeout reached (5 mins). Automatically turned OFF Living Room Lights.")
+                        
+                # In Manual Mode: Generate notification suggestion once vacant
+                elif system_mode == 'MANUAL' and elapsed == 300:
+                    if relay_status.get(4, False):
+                        conn = sqlite3.connect(DB_FILE)
+                        c = conn.cursor()
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        c.execute("INSERT INTO suggestions (message, confidence, timestamp) VALUES (?, ?, ?)",
+                                  ("No motion detected for 5 minutes. Turn OFF Living Room Lights?", "High (94%)", now_str))
+                        conn.commit()
+                        conn.close()
+
+            occupancy_state["rcwl"] = r_val
+            occupancy_state["mmwave"] = m_val
+            occupancy_state["pir"] = p_val
+        except Exception:
+            pass
+        time.sleep(0.3)
+
+
+def pfc_automation_engine():
+    """Automated Power Factor Correction (PFC) loop for Relays 1, 2, 3 and Contactors K1, K2, K3"""
+    while True:
+        try:
+            if pfc_auto_mode or system_mode == 'AI_ASSISTED':
+                # Interlock Check: If ACU is active/starting, turn OFF capacitor banks
+                acu_on = relay_status.get(7, False)
+                if acu_on:
+                    for r_id in [1, 2, 3]:
+                        if relay_status.get(r_id, False) and relays.get(r_id):
+                            relays[r_id].off()
+                            relay_status[r_id] = False
+                            print(f"⚡ [PFC Interlock]: ACU is ON. Disengaged Capacitor Bank Relay {r_id}.")
+                else:
+                    main_p = latest_sensor_data.get("power", 0.0)
+                    main_pf = latest_sensor_data.get("power_factor", 1.0)
+                    
+                    # Compensate only when load is actively drawing power (> 50W) and PF is lagging
+                    if main_p > 50.0 and 0.1 < main_pf < 0.97:
+                        if main_pf < 0.85:
+                            if not relay_status.get(1, False) and relays.get(1):
+                                relays[1].on(); relay_status[1] = True
+                            if not relay_status.get(2, False) and relays.get(2):
+                                relays[2].on(); relay_status[2] = True
+                            print(f"⚡ [PFC Auto]: Low PF ({main_pf:.2f}). Engaged Capacitor Banks 1 & 2.")
+                        else:
+                            if not relay_status.get(1, False) and relays.get(1):
+                                relays[1].on(); relay_status[1] = True
+                            print(f"⚡ [PFC Auto]: Lagging PF ({main_pf:.2f}). Engaged Capacitor Bank 1.")
+                    elif main_pf >= 0.97 or main_p < 25.0:
+                        # De-energize to avoid leading PF / overcompensation
+                        for r_id in [1, 2, 3]:
+                            if relay_status.get(r_id, False) and relays.get(r_id):
+                                relays[r_id].off()
+                                relay_status[r_id] = False
+                                print(f"⚡ [PFC Auto]: Optimal PF ({main_pf:.2f}) or idle load. Disengaged Bank {r_id}.")
+        except Exception:
+            pass
+        time.sleep(2)
+
+
+def periodic_energy_logger():
+    """Records 11-channel PZEM data into SQLite every 5 minutes (300s) as required by thesis spec"""
+    while True:
+        time.sleep(300) # Every 5 minutes
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            for ch_key, ch_data in pzem_branches.items():
+                c.execute('''
+                    INSERT INTO energy_logs (timestamp, channel, voltage, current, power, energy, power_factor, frequency)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    now_str,
+                    ch_data.get("channel", 0),
+                    ch_data.get("voltage", 0.0),
+                    ch_data.get("current", 0.0),
+                    ch_data.get("power", 0.0),
+                    ch_data.get("energy", 0.0),
+                    ch_data.get("power_factor", 0.0),
+                    ch_data.get("frequency", 0.0)
+                ))
+            conn.commit()
+            conn.close()
+            print(f"💾 [Energy Logger]: Stored 5-minute snapshot for all 11 PZEM channels at {now_str}")
+        except Exception as e:
+            print(f"⚠️ Error logging 5-minute energy data: {e}")
+
+
+# Start background threads
 serial_thread = threading.Thread(target=esp32_serial_worker, daemon=True)
 serial_thread.start()
+
+occupancy_thread = threading.Thread(target=occupancy_fusion_engine, daemon=True)
+occupancy_thread.start()
+
+pfc_thread = threading.Thread(target=pfc_automation_engine, daemon=True)
+pfc_thread.start()
+
+logger_thread = threading.Thread(target=periodic_energy_logger, daemon=True)
+logger_thread.start()
 
 if __name__ == '__main__':
     # I-run ang server sa port 5000 at i-expose sa network (0.0.0.0)
