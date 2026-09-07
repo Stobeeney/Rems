@@ -64,7 +64,7 @@
                         </li>
                         <li data-page="active-devices">
                             <i class="ph ph-power"></i>
-                            <span>Ano mga Nakabukas</span>
+                            <span>Active Loads</span>
                             <span class="nav-badge" id="nav-active-count" style="display:none; background: var(--primary); color: #000; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 10px; margin-left: auto;">0</span>
                         </li>
                         <li data-page="energy-monitoring">
@@ -379,16 +379,16 @@
         </div>
     </template>
 
-    <!-- ACTIVE DEVICES TEMPLATE (Ano mga Nakabukas) -->
+    <!-- ACTIVE LOADS TEMPLATE -->
     <template id="tpl-active-devices">
         <div style="display: flex; flex-direction: column; gap: 16px;">
             <div class="card" style="padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, rgba(34,197,94,0.12), rgba(15,23,42,0.9)); border: 1px solid rgba(34,197,94,0.3);">
                 <div>
                     <h2 style="font-size: 18px; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 10px;">
-                        <i class="ph-fill ph-power" style="color: var(--primary); font-size: 24px;"></i> ANO MGA NAKABUKAS (ACTIVE DEVICES)
+                        <i class="ph-fill ph-power" style="color: var(--primary); font-size: 24px;"></i> ACTIVE LOADS & MONITORED DEVICES
                     </h2>
                     <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                        Real-time load monitor displaying all currently powered appliances with 1-click cutoff.
+                        Real-time load telemetry displaying all currently energized branch circuits with fast cutoff capability.
                     </p>
                 </div>
                 <div style="display: flex; gap: 16px; align-items: center;">
@@ -397,7 +397,7 @@
                         <div style="font-size: 22px; font-weight: 800; color: var(--primary);" id="active-devices-total-count">0</div>
                     </div>
                     <button class="btn btn-outline" style="border-color: #ef4444; color: #ef4444; padding: 10px 18px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px;" onclick="turnOffAllNonCritical()">
-                        <i class="ph ph-power" style="font-size: 16px;"></i> Patayin Lahat ng Hindi Critical
+                        <i class="ph ph-power" style="font-size: 16px;"></i> Disconnect All Non-Critical Loads
                     </button>
                 </div>
             </div>
@@ -405,8 +405,8 @@
             <div id="active-devices-container">
                 <div id="active-devices-empty" style="text-align: center; padding: 60px 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed var(--border-color);">
                     <i class="ph ph-check-circle" style="font-size: 48px; color: var(--primary); margin-bottom: 12px; display: inline-block;"></i>
-                    <h3 style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 4px;">Lahat ng Appliances ay Nakapatay</h3>
-                    <p style="font-size: 12px; color: var(--text-muted);">Walang aktibong konsumo sa mga minomonitor na branch circuits.</p>
+                    <h3 style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 4px;">All Non-Critical Loads Are De-energized</h3>
+                    <p style="font-size: 12px; color: var(--text-muted);">No active power consumption detected across monitored non-critical branch circuits.</p>
                 </div>
                 <div id="active-devices-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
                     <!-- Populated dynamically via app.js -->
@@ -815,9 +815,13 @@
         <div style="display: flex; flex-direction: column; gap: 16px;">
             <div class="sub-tabs-container">
                 <div class="sub-tabs">
-                    <button class="sub-tab-btn active">Active Alerts (0)</button>
-                    <button class="sub-tab-btn">Alert History</button>
-                    <button class="sub-tab-btn">Notifications</button>
+                    <button class="sub-tab-btn active" id="subtab-alerts-active" onclick="switchAlertsTab('active')">Active Alerts (<span id="alerts-active-badge">0</span>)</button>
+                    <button class="sub-tab-btn" id="subtab-alerts-history" onclick="switchAlertsTab('history')">Alert History</button>
+                </div>
+                <div style="margin-left: auto;">
+                    <button class="btn btn-outline" style="font-size: 11px; padding: 6px 14px;" onclick="clearAllActiveAlerts()">
+                        <i class="ph ph-check-circle"></i> Dismiss All Active Alerts
+                    </button>
                 </div>
             </div>
 
@@ -898,27 +902,27 @@
                     </div>
                     <div class="form-group">
                         <label>System Name</label>
-                        <input type="text" class="form-control" value="REMS">
+                        <input type="text" class="form-control" value="RECMS" readonly>
                     </div>
                     <div class="form-group">
                         <label>Location</label>
-                        <input type="text" class="form-control" value="Rojas Residence">
+                        <input type="text" class="form-control" value="Residential Energy Panel #1">
                     </div>
                     <div class="form-group">
                         <label>Time Zone</label>
                         <select class="select-dark" style="width: 100%;">
-                            <option>(GMT+08:00) Asia, Philippines</option>
+                            <option>(GMT+08:00) Asia, Manila / Philippines</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Date & Time</label>
+                        <label>Date & Time Source</label>
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="text" class="form-control" value="August 7, 2026  4:04 PM" readonly>
-                            <button class="btn btn-outline" style="flex-shrink: 0;" onclick="alert('RTC Time Synchronized via I2C DS3231!')">Sync</button>
+                            <input type="text" class="form-control" id="settings-rtc-display" value="DS3231 I2C RTC (0x68)" readonly>
+                            <button class="btn btn-outline" style="flex-shrink: 0;" onclick="syncRtcTime()"><i class="ph ph-arrows-clockwise"></i> Sync RTC</button>
                         </div>
                     </div>
                     <div style="margin-top: 20px; text-align: right;">
-                        <button class="btn btn-primary" onclick="alert('System Settings Saved!')">SAVE CHANGES</button>
+                        <button class="btn btn-primary" onclick="alert('System settings updated successfully.')">SAVE CHANGES</button>
                     </div>
                 </div>
 
@@ -940,7 +944,7 @@
                         <input type="text" class="form-control" value="30 sec">
                     </div>
                     <div style="margin-top: 60px; text-align: right;">
-                        <button class="btn btn-primary" onclick="alert('PFC Settings Saved!')">SAVE CHANGES</button>
+                        <button class="btn btn-primary" onclick="alert('PFC settings saved successfully.')">SAVE CHANGES</button>
                     </div>
                 </div>
             </div>
@@ -950,28 +954,29 @@
     <!-- 7. ABOUT SYSTEM TEMPLATE -->
     <template id="tpl-about">
         <div class="card" style="padding: 24px;">
-            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">REMS - AI-Assisted Residential Energy Management Control System</h2>
-            <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px;">
-                Designed and developed for thesis compliance with complete real-time branch energy monitoring, automated power factor correction, presence-based adaptive load actuation, and Gemini AI energy optimization.
+            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">RECMS - Development of an AI-Assisted Residential Energy Management and Control System</h2>
+            <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px; line-height: 1.6;">
+                Developed for academic engineering thesis compliance featuring real-time multi-branch electrical telemetry, automated power factor correction, mmWave human presence adaptive load control, comprehensive safety interlocking, and AI-driven energy conservation recommendations.
             </p>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 12px;">
                 <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
                     <strong style="color: #ffffff;">Hardware Architecture:</strong>
                     <ul style="margin-top: 8px; margin-left: 18px; color: var(--text-muted); line-height: 1.6;">
                         <li>Master Controller: Raspberry Pi 5 (RP1 GPIO + I2C/UART)</li>
-                        <li>Sub-Controller: ESP32 with 16-Channel MUX</li>
-                        <li>Power Monitors: 11x PZEM-004T AC Power Monitors</li>
-                        <li>Actuators: 20x 1-Channel Relay Modules (Active-Low)</li>
-                        <li>Sensors: DS3231 RTC, RCWL-0516 Radar, HLK-LD2410B, HC-SR501</li>
+                        <li>Sub-Controller: ESP32 with 16-Channel MUX (74HC4067)</li>
+                        <li>Power Monitors: 11x PZEM-004T AC Monitors (Main + 10 Branches)</li>
+                        <li>Actuators: 20x 1-Channel Relay Modules (Active-Low) + CJX2-1210 Contactor</li>
+                        <li>Sensors: DS3231 I2C RTC, HLK-LD2410B 24GHz mmWave Presence Sensor</li>
+                        <li>Protection: ACU Compressor Hardware Interlock & Critical Load Guard</li>
                     </ul>
                 </div>
                 <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
                     <strong style="color: #ffffff;">Software Stack:</strong>
                     <ul style="margin-top: 8px; margin-left: 18px; color: var(--text-muted); line-height: 1.6;">
                         <li>Backend: Python 3 Flask, SQLite3, gpiozero (rpi-lgpio)</li>
-                        <li>AI Engine: Google Gemini 3.6 Flash Optimization Loop</li>
+                        <li>AI & Anomaly Engine: Heuristic Rule Engine with Google Gemini Energy Analysis</li>
                         <li>Frontend: HTML5, CSS3 Custom Theme, Chart.js, Phosphor Icons</li>
-                        <li>Display Mode: Chromium Kiosk Mode (1024x600 Scaled)</li>
+                        <li>Display Mode: Chromium Kiosk Mode (1024x600 Scaled for 7-Inch Display)</li>
                     </ul>
                 </div>
             </div>

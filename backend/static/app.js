@@ -35,6 +35,10 @@ function navigateToPage(pageId) {
             initEnergyMonitoringCharts();
         } else if (pageId === 'load-control') {
             initLoadControlTable();
+        } else if (pageId === 'ai-recommendations') {
+            loadAiRecommendations();
+        } else if (pageId === 'alerts') {
+            loadAlerts();
         }
     }
     
@@ -699,7 +703,7 @@ setInterval(async () => {
 }, 1000);
 
 // =============================================================================
-// Active Devices ("Ano mga Nakabukas") & Mode Switching Functions
+// Active Loads ("Active Devices") & Mode Switching Functions
 // =============================================================================
 window.renderActiveDevicesPage = async function() {
     try {
@@ -729,7 +733,7 @@ window.renderActiveDevicesPage = async function() {
                         <div style="font-size: 15px; font-weight: 800; color: #ffffff; margin-top: 2px;">${d.name}</div>
                     </div>
                     <span class="badge-pill" style="background: rgba(34,197,94,0.2); color: #4ade80; font-size: 10px; font-weight: 800;">
-                        <i class="ph-fill ph-check-circle"></i> NAKABUKAS
+                        <i class="ph-fill ph-check-circle"></i> ACTIVE
                     </span>
                 </div>
                 
@@ -739,7 +743,7 @@ window.renderActiveDevicesPage = async function() {
                 </div>
 
                 <button class="btn btn-outline" style="border-color: #ef4444; color: #ef4444; width: 100%; padding: 8px; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="turnOffActiveDevice(${d.id})">
-                    <i class="ph ph-power"></i> Patayin ang Appliance
+                    <i class="ph ph-power"></i> Disconnect Load
                 </button>
             </div>
         `).join('');
@@ -760,21 +764,21 @@ window.turnOffActiveDevice = async function(relayId) {
             renderActiveDevicesPage();
         }
     } catch (e) {
-        alert("Error turning off device: " + e);
+        alert("Error disconnecting load: " + e);
     }
 };
 
 window.turnOffAllNonCritical = async function() {
-    if (!confirm("Sigurado ka bang nais mong patayin ang lahat ng hindi critical na appliances?")) return;
+    if (!confirm("Are you sure you want to disconnect all active non-critical loads?")) return;
     try {
         const res = await fetch('/api/active-devices/turn-off-all', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
             renderActiveDevicesPage();
-            alert(`Napatay na ang ${data.count} na appliances! Nanatiling bukas ang Refrigerator at CCTV.`);
+            alert(`Successfully disconnected ${data.count} non-critical load(s). Refrigerator (#10) and CCTV (#18) remain safely energized.`);
         }
     } catch (e) {
-        alert("Error: " + e);
+        alert("Error disconnecting non-critical loads: " + e);
     }
 };
 
@@ -1334,3 +1338,261 @@ function initPfPzemChart() {
         });
     }
 }
+
+// =============================================================================
+// AI Recommendations & Energy Insights Engine (Academic Thesis Compliance)
+// =============================================================================
+let currentAiSuggestions = [];
+
+window.switchAiTab = function(tabName) {
+    const recTab = document.getElementById('ai-tab-recommendations');
+    const insTab = document.getElementById('ai-tab-insights');
+    const btns = document.querySelectorAll('#tpl-ai-recommendations .sub-tab-btn, .sub-tabs .sub-tab-btn');
+    
+    if (tabName === 'recommendations') {
+        if (recTab) recTab.style.display = 'block';
+        if (insTab) insTab.style.display = 'none';
+    } else {
+        if (recTab) recTab.style.display = 'none';
+        if (insTab) insTab.style.display = 'block';
+    }
+    
+    btns.forEach(btn => {
+        if (btn.textContent.trim().toLowerCase().includes(tabName.toLowerCase())) {
+            btn.classList.add('active');
+        } else if (btn.textContent.trim().toLowerCase().includes('recommendation') || btn.textContent.trim().toLowerCase().includes('insight')) {
+            btn.classList.remove('active');
+        }
+    });
+};
+
+window.loadAiRecommendations = async function() {
+    try {
+        const res = await fetch('/api/suggestions');
+        const data = await res.json();
+        currentAiSuggestions = data || [];
+        
+        const tbody = document.getElementById('ai-recommendations-table-body');
+        if (!tbody) return;
+        
+        const pending = currentAiSuggestions.filter(s => s.status === 'pending');
+        
+        if (pending.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                        <i class="ph ph-sparkle" style="font-size: 32px; color: var(--primary); margin-bottom: 10px; display: block;"></i>
+                        <div style="font-weight: 600; color: #ffffff; font-size: 14px; margin-bottom: 4px;">No Pending AI Recommendations</div>
+                        <div style="font-size: 11px;">Electrical telemetry and occupancy status are currently optimal. System monitors for standby leakage and reactive losses.</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = pending.map(s => {
+            const isHigh = (s.priority || 'Medium') === 'High';
+            const prioBadge = isHigh 
+                ? `<span class="badge-pill" style="background: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 10px; font-weight: 800;">HIGH</span>`
+                : `<span class="badge-pill" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-size: 10px; font-weight: 800;">MEDIUM</span>`;
+            
+            const savingsHtml = s.potential_savings 
+                ? `<div style="font-size: 11px; color: var(--primary); font-weight: 700; margin-top: 4px;"><i class="ph ph-trend-down"></i> Potential Savings: ${s.potential_savings}</div>`
+                : '';
+
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 16px 20px;">
+                        <div style="font-size: 13px; font-weight: 600; color: #ffffff; line-height: 1.5;">${s.message}</div>
+                        ${savingsHtml}
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Generated at ${s.timestamp || 'Recent'} • Confidence: ${s.confidence || '90%'}</div>
+                    </td>
+                    <td style="padding: 16px 12px; vertical-align: middle;">
+                        ${prioBadge}
+                    </td>
+                    <td style="padding: 16px 20px; text-align: right; vertical-align: middle;">
+                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                            <button class="btn btn-primary" style="padding: 6px 14px; font-size: 11px; font-weight: 700;" onclick="approveSuggestion(${s.id})">
+                                <i class="ph ph-check"></i> Approve
+                            </button>
+                            <button class="btn btn-outline" style="padding: 6px 12px; font-size: 11px;" onclick="rejectSuggestion(${s.id})">
+                                <i class="ph ph-x"></i> Reject
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error("Error loading AI recommendations:", e);
+    }
+};
+
+window.approveSuggestion = async function(sId) {
+    try {
+        const res = await fetch(`/api/suggestions/${sId}/approve`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alert("Recommendation approved: Corrective action successfully executed and logged.");
+            loadAiRecommendations();
+        }
+    } catch (e) {
+        alert("Failed to approve suggestion: " + e);
+    }
+};
+
+window.rejectSuggestion = async function(sId) {
+    try {
+        const res = await fetch(`/api/suggestions/${sId}/reject`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            loadAiRecommendations();
+        }
+    } catch (e) {
+        alert("Failed to reject suggestion: " + e);
+    }
+};
+
+// =============================================================================
+// Safety Monitoring & Alerts Engine (Section 1.7 Thesis Compliance)
+// =============================================================================
+let currentAlertsView = 'active';
+let allAlertsData = [];
+
+window.switchAlertsTab = function(tabName) {
+    currentAlertsView = tabName;
+    const btnActive = document.getElementById('subtab-alerts-active');
+    const btnHistory = document.getElementById('subtab-alerts-history');
+    if (tabName === 'active') {
+        if (btnActive) btnActive.classList.add('active');
+        if (btnHistory) btnHistory.classList.remove('active');
+    } else {
+        if (btnActive) btnActive.classList.remove('active');
+        if (btnHistory) btnHistory.classList.add('active');
+    }
+    renderAlertsTable();
+};
+
+window.loadAlerts = async function() {
+    try {
+        const res = await fetch('/api/alerts');
+        const data = await res.json();
+        allAlertsData = data.alerts || [];
+        
+        const activeCount = allAlertsData.filter(a => a.status === 'ACTIVE').length;
+        const badge = document.getElementById('alerts-active-badge');
+        if (badge) badge.textContent = activeCount;
+        
+        renderAlertsTable();
+    } catch (e) {
+        console.error("Error loading alerts:", e);
+    }
+};
+
+function renderAlertsTable() {
+    const tbody = document.getElementById('alerts-table-body');
+    if (!tbody) return;
+    
+    const filtered = currentAlertsView === 'active' 
+        ? allAlertsData.filter(a => a.status === 'ACTIVE')
+        : allAlertsData;
+        
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                    <i class="ph ph-check-circle" style="font-size: 32px; color: var(--primary); margin-bottom: 10px; display: block;"></i>
+                    <div style="font-weight: 600; color: #ffffff; font-size: 14px; margin-bottom: 4px;">
+                        ${currentAlertsView === 'active' ? 'No Active Safety Alerts' : 'No Alert History'}
+                    </div>
+                    <div style="font-size: 11px;">All electrical branch currents, panel temperatures, and relay actuators are operating within normal tolerances.</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = filtered.map(a => {
+        let sevColor = '#60a5fa';
+        let sevBg = 'rgba(59, 130, 246, 0.2)';
+        if (a.severity === 'CRITICAL') {
+            sevColor = '#f87171';
+            sevBg = 'rgba(239, 68, 68, 0.2)';
+        } else if (a.severity === 'WARNING') {
+            sevColor = '#fbbf24';
+            sevBg = 'rgba(251, 191, 36, 0.2)';
+        }
+        
+        const actionBtn = a.status === 'ACTIVE'
+            ? `<button class="btn btn-outline" style="padding: 5px 12px; font-size: 11px;" onclick="dismissAlert(${a.id})">Dismiss</button>`
+            : `<span style="color: var(--text-muted); font-size: 11px;">Resolved</span>`;
+            
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 14px 20px; font-weight: 600; color: #ffffff;">
+                    ${a.message}
+                </td>
+                <td style="padding: 14px 12px;">
+                    <span class="badge-pill" style="background: ${sevBg}; color: ${sevColor}; font-size: 10px; font-weight: 800;">
+                        ${a.severity}
+                    </span>
+                </td>
+                <td style="padding: 14px 12px; color: var(--text-muted); font-size: 11px;">
+                    ${a.timestamp}
+                </td>
+                <td style="padding: 14px 12px;">
+                    <span style="font-size: 11px; font-weight: 700; color: ${a.status === 'ACTIVE' ? '#f87171' : '#4ade80'};">
+                        ${a.status}
+                    </span>
+                </td>
+                <td style="padding: 14px 20px; text-align: right;">
+                    ${actionBtn}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.dismissAlert = async function(aId) {
+    try {
+        const res = await fetch(`/api/alerts/${aId}/dismiss`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            loadAlerts();
+        }
+    } catch (e) {
+        alert("Error dismissing alert: " + e);
+    }
+};
+
+window.clearAllActiveAlerts = async function() {
+    try {
+        const res = await fetch('/api/alerts/clear-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            loadAlerts();
+        }
+    } catch (e) {
+        alert("Error clearing alerts: " + e);
+    }
+};
+
+// =============================================================================
+// DS3231 I2C RTC Time Synchronization
+// =============================================================================
+window.syncRtcTime = async function() {
+    try {
+        const res = await fetch('/api/rtc/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            const rtcDisplay = document.getElementById('settings-rtc-display');
+            if (rtcDisplay) rtcDisplay.value = data.timestamp + " (Hardware Synced)";
+            alert(`RTC Synchronization Successful:\nSystem clock synchronized with DS3231 hardware module.\nTimestamp: ${data.timestamp}`);
+        } else {
+            alert("RTC Sync Failed: " + (data.message || "Hardware module error"));
+        }
+    } catch (e) {
+        alert("Error synchronizing with RTC module: " + e);
+    }
+};
+
