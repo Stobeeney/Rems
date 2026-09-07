@@ -775,7 +775,15 @@ def occupancy_engine():
         try:
             now = time.time()
             any_detected = False
-            for zone_key, sensor_dev in hlk_sensors.items():
+            for zone_key, pin in HLK_PINS.items():
+                sensor_dev = hlk_sensors.get(zone_key)
+                if sensor_dev is None:
+                    try:
+                        hlk_sensors[zone_key] = DigitalInputDevice(pin, pull_up=False)
+                        sensor_dev = hlk_sensors[zone_key]
+                        print(f"✅ Recovered HLK sensor on GPIO {pin} ({zone_key})")
+                    except Exception:
+                        sensor_dev = None
                 val = bool(sensor_dev.value) if sensor_dev else False
                 zone_info = occupancy_state["zones"][zone_key]
                 zone_info["detected"] = val

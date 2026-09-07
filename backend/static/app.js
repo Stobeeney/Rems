@@ -551,13 +551,14 @@ setInterval(async () => {
                 const hlkTimer = document.getElementById('hlk-timer-text');
                 const hlkBadge = document.getElementById('hlk-status-badge');
                 
-                if (occ.detected) {
+                const isOccupied = (occ.status === 'OCCUPIED' || occ.detected);
+                if (isOccupied) {
                     if (hlkDot) {
                         hlkDot.style.background = '#22c55e';
                         hlkDot.style.boxShadow = '0 0 14px #22c55e';
                     }
                     if (hlkText) {
-                        hlkText.textContent = 'OCCUPIED (PRESENCE DETECTED)';
+                        hlkText.textContent = occ.detected ? 'OCCUPIED (MOTION DETECTED)' : 'OCCUPIED (PRESENCE / STILL)';
                         hlkText.style.color = '#4ade80';
                     }
                     if (hlkBadge) {
@@ -565,7 +566,11 @@ setInterval(async () => {
                         hlkBadge.style.background = 'rgba(34, 197, 94, 0.25)';
                         hlkBadge.style.color = '#86efac';
                     }
-                    if (hlkTimer) hlkTimer.textContent = 'Micro-motion / Presence active on GPIO 14 (Pin 8)';
+                    if (hlkTimer) {
+                        hlkTimer.textContent = occ.detected 
+                            ? 'Micro-motion / Presence active on GPIO 14 (Pin 8)'
+                            : `Presence maintained (Stationary for ${occ.vacancy_seconds || 0}s)`;
+                    }
                 } else {
                     if (hlkDot) {
                         hlkDot.style.background = '#94a3b8';
@@ -580,7 +585,12 @@ setInterval(async () => {
                         hlkBadge.style.background = 'rgba(148, 163, 184, 0.2)';
                         hlkBadge.style.color = '#cbd5e1';
                     }
-                    if (hlkTimer) hlkTimer.textContent = `No presence detected for ${occ.vacancy_seconds || 0}s`;
+                    const remaining = Math.max(0, 120 - (occ.vacancy_seconds || 0));
+                    if (hlkTimer) {
+                        hlkTimer.textContent = remaining > 0 
+                            ? `Vacant for ${occ.vacancy_seconds || 0}s (Auto-OFF in ${remaining}s)`
+                            : `Vacant for ${occ.vacancy_seconds || 0}s (Auto-cutoff executed)`;
+                    }
                 }
 
                 // Dynamically display which loads are linked to the presence sensor
