@@ -47,31 +47,38 @@ for r_id, pin in relay_pins.items():
         relay_status[r_id] = False
 
 # =============================================================================
-# 2. Hardware Sensors: Occupancy & Human Presence (Sensor Fusion)
+# 2. Hardware Sensor: HLK-LD2410B 24GHz mmWave Human Presence
 # =============================================================================
-# Sensor 1: RCWL-0516 (Microwave Doppler Radar) -> GPIO 14 (Pin 8)
-# Sensor 2: HLK-LD2410B (24GHz mmWave Presence OUT) -> GPIO 15 (Pin 10)
-# Sensor 3: HC-SR501 (PIR Motion Sensor) -> GPIO 25 (Pin 22)
-RCWL_PIN = 14
-MMWAVE_PIN = 15
-PIR_PIN = 25
-
-occupancy_sensors = {}
-try:
-    occupancy_sensors['rcwl'] = DigitalInputDevice(RCWL_PIN, pull_up=False)
-    occupancy_sensors['mmwave'] = DigitalInputDevice(MMWAVE_PIN, pull_up=False)
-    occupancy_sensors['pir'] = DigitalInputDevice(PIR_PIN, pull_up=False)
-    print("✅ Occupancy sensors initialized on GPIO 14, 15, 25")
-except Exception as e:
-    print(f"⚠️ Could not initialize all occupancy sensors: {e}")
+# Primary Tested Sensor: HLK-LD2410B OUT -> GPIO 14 (Header Pin 8)
+# Multi-zone Support: GPIO 14 (Living Room), 15 (Master Bed), 25 (Bed 2), 26 (Kitchen)
+HLK_PINS = {
+    "zone1": 14,  # Living Room (Tested on GPIO 14 / Pin 8)
+    "zone2": 15,  # Master Bedroom (GPIO 15 / Pin 10)
+    "zone3": 25,  # Bedroom 2 (GPIO 25 / Pin 22)
+    "zone4": 26   # Kitchen (GPIO 26 / Pin 37)
+}
+hlk_sensors = {}
+for zone, pin in HLK_PINS.items():
+    try:
+        hlk_sensors[zone] = DigitalInputDevice(pin, pull_up=False)
+        print(f"✅ HLK-LD2410B sensor initialized on GPIO {pin} ({zone})")
+    except Exception as e:
+        hlk_sensors[zone] = None
+        print(f"⚠️ Could not initialize HLK on GPIO {pin}: {e}")
 
 occupancy_state = {
-    "rcwl": False,
-    "mmwave": False,
-    "pir": False,
+    "sensor": "HLK-LD2410B (24GHz mmWave)",
+    "pin": 14,
+    "detected": False,
     "status": "VACANT",
     "last_motion_time": time.time(),
-    "vacancy_seconds": 0
+    "vacancy_seconds": 0,
+    "zones": {
+        "zone1": {"name": "Living Room (GPIO 14)", "pin": 14, "detected": False, "status": "VACANT"},
+        "zone2": {"name": "Master Bedroom (GPIO 15)", "pin": 15, "detected": False, "status": "VACANT"},
+        "zone3": {"name": "Bedroom 2 (GPIO 25)", "pin": 25, "detected": False, "status": "VACANT"},
+        "zone4": {"name": "Kitchen (GPIO 26)", "pin": 26, "detected": False, "status": "VACANT"}
+    }
 }
 
 app = Flask(__name__)
@@ -295,7 +302,21 @@ def control_relay():
             load_auto_mode = False
         return jsonify({"success": True, "mode": "MANUAL"})
 
-    # If user manually toggles a relay, automatically permit it!
+    # Safety Interlock: ACU & Capacitor Banks
+    if action == 'on':
+        if relay_id == 7:
+            # ACU is turned ON -> Immediately shut down Capacitor Banks K1, K2, K3
+            for cap_id in [1, 2, 3]:
+                if relays.get(cap_id):
+                    relays[cap_id].off()
+                relay_status[cap_id] = False
+            print("🔒 [ACU Interlock]: ACU engaged! Forcibly shut down Capacitor Banks K1, K2, K3.")
+        elif relay_id in [1, 2, 3] and relay_status.get(7, False):
+            return jsonify({
+                "success": False, 
+                "message": "ACU Interlock Active: Cannot energize Capacitor Banks while ACU (Relay 7) is running."
+            }), 400
+
     relay_obj = relays.get(relay_id)
         
     if relay_obj:
@@ -400,7 +421,7 @@ def manage_system_mode():
 
 @app.route('/api/occupancy', methods=['GET'])
 def get_occupancy_state():
-    """Returns multi-sensor fusion occupancy status (RCWL-0516, HLK-LD2410B, HC-SR501)"""
+    """Returns HLK-LD2410B mmWave human presence status (GPIO 14 primary tested)"""
     return jsonify(occupancy_state), 200
 
 @app.route('/api/active-devices', methods=['GET'])
@@ -424,6 +445,18 @@ def get_active_devices():
                 "status": "ON"
             })
     return jsonify({"success": True, "count": len(active), "devices": active}), 200
+
+@app.route('/api/active-devices/turn-off-all', methods=['POST'])
+def turn_off_all_active_devices():
+    """Turns off all active non-critical loads (preserves Refrigerator #10, CCTV #18, and PFC Banks)"""
+    turned_off = []
+    for r_id in range(4, 21):
+        if r_id not in [10, 18] and relay_status.get(r_id, False):
+            if relays.get(r_id):
+                relays[r_id].off()
+            relay_status[r_id] = False
+            turned_off.append(r_id)
+    return jsonify({"success": True, "turned_off": turned_off, "count": len(turned_off)}), 200
 
 @app.route('/api/data', methods=['POST'])
 def receive_data_from_esp32():
@@ -465,11 +498,16 @@ def receive_data_from_esp32():
 @app.route('/api/data', methods=['GET'])
 def send_data_to_frontend():
     """
-    Dito kukuha ng data yung Front-End (Vite/app.js) para i-display sa Dashboard.
-    Naglalaman ng parehong top-level metrics (Main Panel) at branches dictionary (C0-C10).
+    Dito kukuha ng data yung Front-End (app.js) para i-display sa RECMS Dashboard.
+    Naglalaman ng metrics, branches (C0-C10), occupancy, system_mode, pfc_auto, load_auto, at relays.
     """
     resp = dict(latest_sensor_data)
     resp["branches"] = pzem_branches
+    resp["occupancy"] = occupancy_state
+    resp["system_mode"] = system_mode
+    resp["pfc_auto"] = pfc_auto_mode
+    resp["load_auto"] = load_auto_mode
+    resp["relays"] = {str(k): ("ON" if v else "OFF") for k, v in relay_status.items()}
     return jsonify(resp), 200
 
 
@@ -663,28 +701,36 @@ def esp32_serial_worker():
 # 4. Automation Engines: Occupancy Fusion, PFC Loop, & 5-min Energy Logger
 # =============================================================================
 
-def occupancy_fusion_engine():
-    """Background engine that fuses RCWL-0516, HLK-LD2410B, and HC-SR501 inputs"""
+def occupancy_engine():
+    """Background engine monitoring HLK-LD2410B mmWave human presence (GPIO 14 primary tested)"""
     global occupancy_state
     while True:
         try:
-            r_val = bool(occupancy_sensors['rcwl'].value) if 'rcwl' in occupancy_sensors else False
-            m_val = bool(occupancy_sensors['mmwave'].value) if 'mmwave' in occupancy_sensors else False
-            p_val = bool(occupancy_sensors['pir'].value) if 'pir' in occupancy_sensors else False
-            
-            motion_active = (r_val or m_val or p_val)
             now = time.time()
-            if motion_active:
+            any_detected = False
+            for zone_key, sensor_dev in hlk_sensors.items():
+                val = bool(sensor_dev.value) if sensor_dev else False
+                zone_info = occupancy_state["zones"][zone_key]
+                zone_info["detected"] = val
+                zone_info["status"] = "OCCUPIED" if val else "VACANT"
+                if val:
+                    any_detected = True
+
+            # Primary tested sensor is zone 1 (GPIO 14)
+            prim_detected = occupancy_state["zones"]["zone1"]["detected"] or any_detected
+            occupancy_state["detected"] = prim_detected
+            
+            if prim_detected:
                 occupancy_state["last_motion_time"] = now
                 occupancy_state["vacancy_seconds"] = 0
                 occupancy_state["status"] = "OCCUPIED"
                 
-                # In AI-Assisted Mode: Auto-turn ON designated lighting (Relay 4 / Living Room Lights)
+                # In AI-Assisted Mode: Auto-turn ON Relay 4 (Living Room Lights)
                 if system_mode == 'AI_ASSISTED':
                     if not relay_status.get(4, False) and relays.get(4):
                         relays[4].on()
                         relay_status[4] = True
-                        print("🤖 [AI-Assisted]: Motion verified. Automatically turned ON Living Room Lights.")
+                        print("🤖 [AI-Assisted]: HLK mmWave detected presence. Turned ON Living Room Lights.")
             else:
                 elapsed = int(now - occupancy_state.get("last_motion_time", now))
                 occupancy_state["vacancy_seconds"] = elapsed
@@ -696,7 +742,7 @@ def occupancy_fusion_engine():
                     if relay_status.get(4, False) and relays.get(4):
                         relays[4].off()
                         relay_status[4] = False
-                        print("🤖 [AI-Assisted]: Vacancy timeout reached (5 mins). Automatically turned OFF Living Room Lights.")
+                        print("🤖 [AI-Assisted]: Vacancy timeout (5m). Turned OFF Living Room Lights.")
                         
                 # In Manual Mode: Generate notification suggestion once vacant
                 elif system_mode == 'MANUAL' and elapsed == 300:
@@ -705,13 +751,9 @@ def occupancy_fusion_engine():
                         c = conn.cursor()
                         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         c.execute("INSERT INTO suggestions (message, confidence, timestamp) VALUES (?, ?, ?)",
-                                  ("No motion detected for 5 minutes. Turn OFF Living Room Lights?", "High (94%)", now_str))
+                                  ("No human presence detected for 5 minutes. Turn OFF Living Room Lights?", "High (95%)", now_str))
                         conn.commit()
                         conn.close()
-
-            occupancy_state["rcwl"] = r_val
-            occupancy_state["mmwave"] = m_val
-            occupancy_state["pir"] = p_val
         except Exception:
             pass
         time.sleep(0.3)
@@ -792,7 +834,7 @@ def periodic_energy_logger():
 serial_thread = threading.Thread(target=esp32_serial_worker, daemon=True)
 serial_thread.start()
 
-occupancy_thread = threading.Thread(target=occupancy_fusion_engine, daemon=True)
+occupancy_thread = threading.Thread(target=occupancy_engine, daemon=True)
 occupancy_thread.start()
 
 pfc_thread = threading.Thread(target=pfc_automation_engine, daemon=True)

@@ -29,6 +29,8 @@ function navigateToPage(pageId) {
         // Initialize page specific components
         if (pageId === 'dashboard') {
             initDashboardCharts();
+        } else if (pageId === 'active-devices') {
+            renderActiveDevicesPage();
         } else if (pageId === 'energy-monitoring') {
             initEnergyMonitoringCharts();
         } else if (pageId === 'load-control') {
@@ -469,9 +471,237 @@ setInterval(async () => {
                 chartLivePf.data.datasets[0].data.shift();
                 chartLivePf.update('none');
             }
+
+            // HLK-LD2410B mmWave Presence Card Updates (Tested on GPIO 14 / Pin 8)
+            if (data.occupancy) {
+                const occ = data.occupancy;
+                const hlkDot = document.getElementById('hlk-pulse-dot');
+                const hlkText = document.getElementById('hlk-status-text');
+                const hlkTimer = document.getElementById('hlk-timer-text');
+                const hlkBadge = document.getElementById('hlk-status-badge');
+                
+                if (occ.detected) {
+                    if (hlkDot) {
+                        hlkDot.style.background = '#22c55e';
+                        hlkDot.style.boxShadow = '0 0 14px #22c55e';
+                    }
+                    if (hlkText) {
+                        hlkText.textContent = 'OCCUPIED (PRESENCE DETECTED)';
+                        hlkText.style.color = '#4ade80';
+                    }
+                    if (hlkBadge) {
+                        hlkBadge.textContent = 'OCCUPIED';
+                        hlkBadge.style.background = 'rgba(34, 197, 94, 0.25)';
+                        hlkBadge.style.color = '#86efac';
+                    }
+                    if (hlkTimer) hlkTimer.textContent = 'Micro-motion / Presence active on GPIO 14 (Pin 8)';
+                } else {
+                    if (hlkDot) {
+                        hlkDot.style.background = '#94a3b8';
+                        hlkDot.style.boxShadow = 'none';
+                    }
+                    if (hlkText) {
+                        hlkText.textContent = 'VACANT';
+                        hlkText.style.color = '#ffffff';
+                    }
+                    if (hlkBadge) {
+                        hlkBadge.textContent = 'VACANT';
+                        hlkBadge.style.background = 'rgba(148, 163, 184, 0.2)';
+                        hlkBadge.style.color = '#cbd5e1';
+                    }
+                    if (hlkTimer) hlkTimer.textContent = `No presence detected for ${occ.vacancy_seconds || 0}s`;
+                }
+            }
+
+            // PFC Capacitor Bank Status & ACU Interlock
+            if (data.relays) {
+                const b1 = data.relays['1'] === 'ON';
+                const b2 = data.relays['2'] === 'ON';
+                const b3 = data.relays['3'] === 'ON';
+                const acuOn = data.relays['7'] === 'ON';
+
+                const b1Badge = document.getElementById('pfc-bank1-badge');
+                const b2Badge = document.getElementById('pfc-bank2-badge');
+                const b3Badge = document.getElementById('pfc-bank3-badge');
+                const lockBadge = document.getElementById('pfc-interlock-badge');
+
+                if (b1Badge) {
+                    b1Badge.textContent = b1 ? 'ACTIVE' : 'OFF';
+                    b1Badge.style.background = b1 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)';
+                    b1Badge.style.color = b1 ? '#4ade80' : 'var(--text-muted)';
+                }
+                if (b2Badge) {
+                    b2Badge.textContent = b2 ? 'ACTIVE' : 'OFF';
+                    b2Badge.style.background = b2 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)';
+                    b2Badge.style.color = b2 ? '#4ade80' : 'var(--text-muted)';
+                }
+                if (b3Badge) {
+                    b3Badge.textContent = b3 ? 'ACTIVE' : 'OFF';
+                    b3Badge.style.background = b3 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)';
+                    b3Badge.style.color = b3 ? '#4ade80' : 'var(--text-muted)';
+                }
+
+                if (lockBadge) {
+                    if (acuOn) {
+                        lockBadge.textContent = 'INTERLOCKED (ACU ON)';
+                        lockBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                        lockBadge.style.color = '#f87171';
+                    } else {
+                        lockBadge.textContent = 'ACU SAFE';
+                        lockBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                        lockBadge.style.color = '#4ade80';
+                    }
+                }
+
+                // Active Devices Badge Count
+                let activeRelays = 0;
+                for (let r = 1; r <= 20; r++) {
+                    if (data.relays[String(r)] === 'ON') activeRelays++;
+                }
+                const navBadge = document.getElementById('nav-active-count');
+                const totalActiveEl = document.getElementById('active-devices-total-count');
+                if (navBadge) {
+                    navBadge.textContent = activeRelays;
+                    navBadge.style.display = activeRelays > 0 ? 'inline-block' : 'none';
+                }
+                if (totalActiveEl) totalActiveEl.textContent = activeRelays;
+            }
+
+            // System Mode Highlighting
+            if (data.system_mode) {
+                const mode = data.system_mode.toUpperCase();
+                const mBadge = document.getElementById('sys-mode-badge');
+                if (mBadge) mBadge.textContent = mode;
+
+                ['manual', 'ai', 'security'].forEach(m => {
+                    const btn = document.getElementById(`btn-mode-${m}`);
+                    if (btn) {
+                        const targetMode = m === 'ai' ? 'AI_ASSISTED' : m.toUpperCase();
+                        if (mode === targetMode) {
+                            btn.classList.add('active');
+                            btn.style.background = 'var(--primary)';
+                            btn.style.color = '#000000';
+                            btn.style.borderColor = 'var(--primary)';
+                        } else {
+                            btn.classList.remove('active');
+                            btn.style.background = 'transparent';
+                            btn.style.color = '#ffffff';
+                            btn.style.borderColor = 'var(--border-color)';
+                        }
+                    }
+                });
+            }
+
+            // If active devices grid is currently on screen, refresh it
+            if (document.getElementById('active-devices-grid')) {
+                renderActiveDevicesPage();
+            }
         }
     } catch (e) {}
 }, 1000);
+
+// =============================================================================
+// Active Devices ("Ano mga Nakabukas") & Mode Switching Functions
+// =============================================================================
+window.renderActiveDevicesPage = async function() {
+    try {
+        const res = await fetch('/api/active-devices');
+        const data = await res.json();
+        const grid = document.getElementById('active-devices-grid');
+        const emptyState = document.getElementById('active-devices-empty');
+        const totalCountEl = document.getElementById('active-devices-total-count');
+        
+        if (!grid || !data.success) return;
+        
+        const devices = data.devices || [];
+        if (totalCountEl) totalCountEl.textContent = devices.length;
+
+        if (devices.length === 0) {
+            grid.innerHTML = '';
+            if (emptyState) emptyState.style.display = 'block';
+            return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+        grid.innerHTML = devices.map(d => `
+            <div class="card" style="padding: 16px; border: 1px solid rgba(34,197,94,0.3); background: rgba(34,197,94,0.03); display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Relay #${d.id} • ${d.room}</div>
+                        <div style="font-size: 15px; font-weight: 800; color: #ffffff; margin-top: 2px;">${d.name}</div>
+                    </div>
+                    <span class="badge-pill" style="background: rgba(34,197,94,0.2); color: #4ade80; font-size: 10px; font-weight: 800;">
+                        <i class="ph-fill ph-check-circle"></i> NAKABUKAS
+                    </span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; font-size: 11px;">
+                    <span style="color: var(--text-muted);">${d.pin || ''}</span>
+                    <span style="font-weight: 700; color: var(--primary);">${parseFloat(d.power || 0).toFixed(2)} kW</span>
+                </div>
+
+                <button class="btn btn-outline" style="border-color: #ef4444; color: #ef4444; width: 100%; padding: 8px; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="turnOffActiveDevice(${d.id})">
+                    <i class="ph ph-power"></i> Patayin ang Appliance
+                </button>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error("Error rendering active devices:", e);
+    }
+};
+
+window.turnOffActiveDevice = async function(relayId) {
+    try {
+        const res = await fetch('/api/relay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ relay_id: relayId, action: 'off' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            renderActiveDevicesPage();
+        }
+    } catch (e) {
+        alert("Error turning off device: " + e);
+    }
+};
+
+window.turnOffAllNonCritical = async function() {
+    if (!confirm("Sigurado ka bang nais mong patayin ang lahat ng hindi critical na appliances?")) return;
+    try {
+        const res = await fetch('/api/active-devices/turn-off-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            renderActiveDevicesPage();
+            alert(`Napatay na ang ${data.count} na appliances! Nanatiling bukas ang Refrigerator at CCTV.`);
+        }
+    } catch (e) {
+        alert("Error: " + e);
+    }
+};
+
+window.setSystemMode = async function(mode) {
+    try {
+        const res = await fetch('/api/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: mode })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const mBadge = document.getElementById('sys-mode-badge');
+            if (mBadge) mBadge.textContent = mode;
+            const descEl = document.getElementById('sys-mode-desc');
+            if (descEl) {
+                if (mode === 'AI_ASSISTED') descEl.textContent = 'AI mode active: Automated lighting via HLK mmWave and PFC interlocks.';
+                else if (mode === 'SECURITY') descEl.textContent = 'Security mode: Non-critical outlets cut off. Security monitoring on.';
+                else descEl.textContent = 'Manual control. Relays stay in current positions without automated tripping.';
+            }
+        }
+    } catch (e) {
+        alert("Error switching mode: " + e);
+    }
+};
 
 
 // =============================================================================
