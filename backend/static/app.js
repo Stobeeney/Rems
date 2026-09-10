@@ -937,7 +937,117 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateToPage(window.location.hash.replace('#', ''));
         }
     });
+
+    // Initialize TFT Touchscreen swipe and drag-to-scroll engine
+    initTouchDragScroll();
 });
+
+// =============================================================================
+// Universal TFT Touchscreen Drag-to-Scroll & Swipe Engine
+// =============================================================================
+function initTouchDragScroll() {
+    let isDragging = false;
+    let hasDragged = false;
+    let startY = 0;
+    let startScrollTop = 0;
+    let lastY = 0;
+    let lastTime = 0;
+    let velocityY = 0;
+    let targetContainer = null;
+    let animId = null;
+
+    function findScrollableParent(el) {
+        let cur = el;
+        while (cur && cur !== document.body && cur !== document.documentElement) {
+            const style = window.getComputedStyle(cur);
+            if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && cur.scrollHeight > cur.clientHeight) {
+                return cur;
+            }
+            cur = cur.parentElement;
+        }
+        return document.getElementById('content-area') || document.querySelector('.page-content');
+    }
+
+    function onTouchStart(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.target && e.target.closest && e.target.closest('input, select, textarea, .slider')) return;
+
+        if (animId) {
+            cancelAnimationFrame(animId);
+            animId = null;
+        }
+
+        const clientY = (e.clientY !== undefined) ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        targetContainer = findScrollableParent(e.target);
+        if (!targetContainer) return;
+
+        isDragging = true;
+        hasDragged = false;
+        startY = clientY;
+        lastY = clientY;
+        startScrollTop = targetContainer.scrollTop;
+        lastTime = performance.now();
+        velocityY = 0;
+    }
+
+    function onTouchMove(e) {
+        if (!isDragging || !targetContainer) return;
+        const clientY = (e.clientY !== undefined) ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        const deltaY = startY - clientY;
+        const now = performance.now();
+        const dt = Math.max(1, now - lastTime);
+
+        velocityY = (lastY - clientY) / dt;
+        lastY = clientY;
+        lastTime = now;
+
+        if (Math.abs(deltaY) > 6 || hasDragged) {
+            hasDragged = true;
+            targetContainer.scrollTop = startScrollTop + deltaY;
+            if (e.cancelable) e.preventDefault();
+        }
+    }
+
+    function onTouchEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+
+        if (hasDragged && Math.abs(velocityY) > 0.12 && targetContainer) {
+            let currentV = velocityY * 16;
+            function step() {
+                if (!targetContainer || Math.abs(currentV) < 0.3) {
+                    animId = null;
+                    return;
+                }
+                targetContainer.scrollTop += currentV;
+                currentV *= 0.93;
+                animId = requestAnimationFrame(step);
+            }
+            animId = requestAnimationFrame(step);
+        }
+    }
+
+    // Suppress unwanted click event if finger was actively dragging/swiping
+    window.addEventListener('click', (e) => {
+        if (hasDragged) {
+            e.stopPropagation();
+            e.preventDefault();
+            hasDragged = false;
+        }
+    }, true);
+
+    // Pointer Events for modern Chromium & TFT Touch
+    window.addEventListener('pointerdown', onTouchStart, { passive: true });
+    window.addEventListener('pointermove', onTouchMove, { passive: false });
+    window.addEventListener('pointerup', onTouchEnd, { passive: true });
+    window.addEventListener('pointercancel', onTouchEnd, { passive: true });
+
+    // Touch Events Fallback
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', onTouchEnd, { passive: true });
+}
 
 
 // =============================================================================
