@@ -846,13 +846,111 @@ window.doLogin = async function(e) {
     }
 };
 
+// Global Auth Mode Switcher (Login vs Register)
+window.toggleAuthMode = function(mode) {
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const loginTitle = document.getElementById('login-title');
+    const loginError = document.getElementById('login-error');
+    const regError = document.getElementById('reg-error');
+    const regSuccess = document.getElementById('reg-success');
+
+    if (loginError) loginError.style.display = 'none';
+    if (regError) regError.style.display = 'none';
+    if (regSuccess) regSuccess.style.display = 'none';
+
+    if (mode === 'register') {
+        if (loginForm) loginForm.style.display = 'none';
+        if (registerForm) registerForm.style.display = 'block';
+        if (loginTitle) loginTitle.textContent = 'Create REMS Account';
+    } else {
+        if (registerForm) registerForm.style.display = 'none';
+        if (loginForm) loginForm.style.display = 'block';
+        if (loginTitle) loginTitle.textContent = 'Welcome to REMS';
+    }
+};
+
+// Global Registration Handler
+window.doRegister = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const uInput = document.getElementById('reg-username');
+    const pInput = document.getElementById('reg-password');
+    const cpInput = document.getElementById('reg-confirm-password');
+    const regError = document.getElementById('reg-error');
+    const regSuccess = document.getElementById('reg-success');
+
+    if (regError) regError.style.display = 'none';
+    if (regSuccess) regSuccess.style.display = 'none';
+
+    const username = uInput ? uInput.value.trim() : '';
+    const password = pInput ? pInput.value : '';
+    const confirmPassword = cpInput ? cpInput.value : '';
+
+    if (!username) {
+        if (regError) {
+            regError.textContent = 'Please enter a username.';
+            regError.style.display = 'block';
+        }
+        return;
+    }
+    if (!password) {
+        if (regError) {
+            regError.textContent = 'Please enter a password.';
+            regError.style.display = 'block';
+        }
+        return;
+    }
+    if (password !== confirmPassword) {
+        if (regError) {
+            regError.textContent = 'Passwords do not match.';
+            regError.style.display = 'block';
+        }
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            if (regSuccess) {
+                regSuccess.textContent = 'Account created successfully! Switching to sign in...';
+                regSuccess.style.display = 'block';
+            }
+            const loginU = document.getElementById('login-username');
+            const loginP = document.getElementById('login-password');
+            if (loginU) loginU.value = username;
+            if (loginP) loginP.value = password;
+
+            setTimeout(() => {
+                window.toggleAuthMode('login');
+            }, 1200);
+        } else {
+            if (regError) {
+                regError.textContent = data.message || 'Failed to create account.';
+                regError.style.display = 'block';
+            }
+        }
+    } catch (err) {
+        if (regError) {
+            regError.textContent = 'Network error. Please try again.';
+            regError.style.display = 'block';
+        }
+    }
+};
+
 // =============================================================================
 // DOMContentLoaded Initializer
 // =============================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Login Logic ---
+    // --- Login & Register Logic ---
     const loginForm = document.getElementById('login-form');
     const loginSubmitBtn = document.getElementById('login-submit-btn');
+    const registerForm = document.getElementById('register-form');
+    const registerSubmitBtn = document.getElementById('register-submit-btn');
     const loginScreen = document.getElementById('login-screen');
     const mainApp = document.getElementById('main-app');
 
@@ -861,6 +959,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (loginSubmitBtn) {
         loginSubmitBtn.addEventListener('click', window.doLogin);
+    }
+    if (registerForm) {
+        registerForm.addEventListener('submit', window.doRegister);
+    }
+    if (registerSubmitBtn) {
+        registerSubmitBtn.addEventListener('click', window.doRegister);
     }
 
     // Auto bypass login if on local touchscreen
