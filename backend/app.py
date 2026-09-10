@@ -314,6 +314,27 @@ def mobile():
     """
     return render_template('mobile.html')
 
+@app.route('/api/tunnel', methods=['GET'])
+def get_tunnel_status():
+    """Returns the live Cloudflare Tunnel URL if active"""
+    tunnel_file = os.path.join(os.path.dirname(__file__), 'latest_tunnel_url.txt')
+    if not os.path.exists(tunnel_file):
+        tunnel_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'latest_tunnel_url.txt')
+    
+    if os.path.exists(tunnel_file):
+        try:
+            with open(tunnel_file, 'r') as f:
+                url = f.read().strip()
+                if url.startswith('https://'):
+                    return jsonify({
+                        "active": True,
+                        "url": url,
+                        "mobile_url": f"{url.rstrip('/')}/mobile"
+                    })
+        except Exception:
+            pass
+    return jsonify({"active": False, "url": None, "mobile_url": None})
+
 @app.route('/api/relay', methods=['POST'])
 def control_relay():
     global pfc_auto_mode, load_auto_mode
@@ -638,6 +659,9 @@ def get_suggestions():
 
 @app.route('/api/suggestions/<int:s_id>/<action>', methods=['POST'])
 def handle_suggestion(s_id, action):
+    action = action.lower()
+    if action == 'apply': action = 'approve'
+    if action == 'dismiss': action = 'reject'
     if action not in ['approve', 'reject']:
         return jsonify({"error": "Invalid action"}), 400
         
@@ -800,7 +824,7 @@ def ai_anomaly_engine():
             # Optional Gemini AI Enrichment if API key is active
             if GEMINI_API_KEY and latest_sensor_data.get('power', 0.0) > 100.0:
                 try:
-                    model = genai.GenerativeModel('gemini-3.6-flash')
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     prompt = f"REMS Energy Check: V={latest_sensor_data['voltage']}V, I={latest_sensor_data['current']}A, P={latest_sensor_data['power']}W, PF={latest_sensor_data['power_factor']}. If anomaly exists, return 1 concise English suggestion in JSON format with 'message' and 'confidence'."
                     resp = model.generate_content(prompt)
                     clean_txt = resp.text.strip()

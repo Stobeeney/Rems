@@ -1,0 +1,10 @@
+{
+  "name": "REMS Energy Monitor",
+  "short_name": "REMS",
+  "description": "Residential Energy Management System with Power Factor Correction",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#10b981",
+  "orientation": "portrait"
+}

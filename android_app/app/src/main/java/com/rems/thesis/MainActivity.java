@@ -65,6 +65,25 @@ public class MainActivity extends AppCompatActivity {
         String customUA = settings.getUserAgentString() + " REMSMobileApp/1.0 (Android)";
         settings.setUserAgentString(customUA);
 
+        // JavaScript interface for Web UI to invoke native settings dialog
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void openServerConfig() {
+                runOnUiThread(() -> showChangeUrlDialog());
+            }
+
+            @android.webkit.JavascriptInterface
+            public String getServerUrl() {
+                return prefs.getString(KEY_SERVER_URL, DEFAULT_URL);
+            }
+        }, "AndroidREMS");
+
+        // Long press gesture fallback to change URL anytime
+        webView.setOnLongClickListener(v -> {
+            showChangeUrlDialog();
+            return true;
+        });
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {

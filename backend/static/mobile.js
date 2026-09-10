@@ -61,7 +61,8 @@ async function loadDevices() {
     try {
         const res = await fetch('/api/devices');
         if (res.ok) {
-            devicesList = await res.json();
+            const data = await res.json();
+            devicesList = Array.isArray(data) ? data : (data.devices || []);
             renderRelays();
             renderFilterChips();
         }
@@ -405,12 +406,15 @@ function renderSuggestions(list) {
             <div class="suggestion-card">
                 <div class="sugg-header">
                     <i class="ph-fill ph-sparkle"></i>
-                    <h4 class="sugg-title">${s.title || 'Optimization Opportunity'}</h4>
+                    <h4 class="sugg-title">${s.message || s.title || 'Optimization Opportunity'}</h4>
                 </div>
-                <p class="sugg-desc">${s.desc || s.description || ''}</p>
+                <p class="sugg-desc">
+                    ${s.potential_savings ? `<span style="color:var(--primary); font-weight:600;">Savings: ${s.potential_savings}</span><br>` : ''}
+                    <span style="font-size:11px; color:var(--text-muted);">Priority: ${s.priority || 'Medium'} • Confidence: ${s.confidence || 'High'}</span>
+                </p>
                 <div class="sugg-actions">
-                    <button class="btn-sugg btn-sugg-apply" onclick="applySuggestion(${s.id})">Apply Recommendation</button>
-                    <button class="btn-sugg btn-sugg-dismiss" onclick="dismissSuggestion(${s.id})">Dismiss</button>
+                    <button class="btn-sugg btn-sugg-apply" onclick="applySuggestion(${s.id})">Approve Action</button>
+                    <button class="btn-sugg btn-sugg-dismiss" onclick="dismissSuggestion(${s.id})">Reject</button>
                 </div>
             </div>
         `;
@@ -420,9 +424,9 @@ function renderSuggestions(list) {
 
 async function applySuggestion(id) {
     try {
-        const res = await fetch(`/api/suggestions/${id}/apply`, { method: 'POST' });
+        const res = await fetch(`/api/suggestions/${id}/approve`, { method: 'POST' });
         if (res.ok) {
-            showToast("Recommendation Applied");
+            showToast("Recommendation Approved");
             pollSuggestions();
             pollRelays();
         }
@@ -433,9 +437,9 @@ async function applySuggestion(id) {
 
 async function dismissSuggestion(id) {
     try {
-        const res = await fetch(`/api/suggestions/${id}/dismiss`, { method: 'POST' });
+        const res = await fetch(`/api/suggestions/${id}/reject`, { method: 'POST' });
         if (res.ok) {
-            showToast("Dismissed");
+            showToast("Suggestion Rejected");
             pollSuggestions();
         }
     } catch (err) {
@@ -458,4 +462,21 @@ function showToast(msg) {
     window.toastTimer = setTimeout(() => {
         toast.classList.remove('show');
     }, 2400);
+}
+
+// Server URL re-configuration bridge
+function configureServerUrl() {
+    if (window.AndroidREMS && typeof window.AndroidREMS.openServerConfig === 'function') {
+        window.AndroidREMS.openServerConfig();
+    } else {
+        const current = window.location.origin;
+        const newUrl = prompt("Enter Raspberry Pi IP or Cloudflare Tunnel URL:", current);
+        if (newUrl && newUrl.trim() !== "") {
+            let target = newUrl.trim();
+            if (!target.startsWith("http://") && !target.startsWith("https://")) {
+                target = "https://" + target;
+            }
+            window.location.href = target.replace(/\/+$/, "") + "/mobile";
+        }
+    }
 }
