@@ -589,8 +589,8 @@ def receive_data_from_esp32():
 @app.route('/api/data', methods=['GET'])
 def send_data_to_frontend():
     """
-    Dito kukuha ng data yung Front-End (app.js) para i-display sa RECMS Dashboard.
-    Naglalaman ng metrics, branches (C0-C10), occupancy, system_mode, pfc_auto, load_auto, at relays.
+    Main telemetry endpoint supplying data to Front-End (app.js) for REMS Dashboard.
+    Contains metrics, branches (C0-C10), occupancy, system_mode, pfc_auto, load_auto, and relays.
     """
     resp = dict(latest_sensor_data)
     resp["branches"] = pzem_branches
@@ -799,7 +799,7 @@ def ai_anomaly_engine():
             if GEMINI_API_KEY and latest_sensor_data.get('power', 0.0) > 100.0:
                 try:
                     model = genai.GenerativeModel('gemini-3.6-flash')
-                    prompt = f"RECMS Energy Check: V={latest_sensor_data['voltage']}V, I={latest_sensor_data['current']}A, P={latest_sensor_data['power']}W, PF={latest_sensor_data['power_factor']}. If anomaly exists, return 1 concise English suggestion in JSON format with 'message' and 'confidence'."
+                    prompt = f"REMS Energy Check: V={latest_sensor_data['voltage']}V, I={latest_sensor_data['current']}A, P={latest_sensor_data['power']}W, PF={latest_sensor_data['power_factor']}. If anomaly exists, return 1 concise English suggestion in JSON format with 'message' and 'confidence'."
                     resp = model.generate_content(prompt)
                     clean_txt = resp.text.strip()
                     if clean_txt.startswith("```json"):

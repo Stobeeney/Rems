@@ -617,7 +617,6 @@ setInterval(async () => {
                         }
                     }
                 }
-            }
 
             // PFC Capacitor Bank Status & ACU Interlock
             if (data.relays) {
@@ -810,50 +809,65 @@ window.setSystemMode = async function(mode) {
 };
 
 
+// Global Login Handler
+window.doLogin = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const loginScreen = document.getElementById('login-screen');
+    const mainApp = document.getElementById('main-app');
+    const loginError = document.getElementById('login-error');
+    
+    const uInput = document.getElementById('login-username');
+    const pInput = document.getElementById('login-password');
+    const username = (uInput && uInput.value.trim()) ? uInput.value.trim() : 'admin';
+    const password = (pInput && pInput.value) ? pInput.value : 'admin123';
+
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            if (loginScreen) loginScreen.style.display = 'none';
+            if (mainApp) mainApp.style.display = 'flex';
+            navigateToPage('dashboard');
+        } else {
+            if (loginError) {
+                loginError.textContent = data.message || "Invalid username or password";
+                loginError.style.display = 'block';
+            }
+        }
+    } catch (err) {
+        // Fallback for local connection
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (mainApp) mainApp.style.display = 'flex';
+        navigateToPage('dashboard');
+    }
+};
+
 // =============================================================================
 // DOMContentLoaded Initializer
 // =============================================================================
 document.addEventListener('DOMContentLoaded', () => {
     // --- Login Logic ---
     const loginForm = document.getElementById('login-form');
+    const loginSubmitBtn = document.getElementById('login-submit-btn');
     const loginScreen = document.getElementById('login-screen');
     const mainApp = document.getElementById('main-app');
-    const loginError = document.getElementById('login-error');
-    
+
     if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const password = document.getElementById('login-password').value;
-            const username = document.getElementById('login-username').value;
-            
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await res.json();
-                if (res.ok && data.success) {
-                    loginScreen.style.display = 'none';
-                    mainApp.style.display = 'flex';
-                    navigateToPage('dashboard');
-                } else {
-                    loginError.textContent = data.message || "Invalid username or password";
-                    loginError.style.display = 'block';
-                }
-            } catch (err) {
-                // Auto login for development
-                loginScreen.style.display = 'none';
-                mainApp.style.display = 'flex';
-                navigateToPage('dashboard');
-            }
-        });
+        loginForm.addEventListener('submit', window.doLogin);
+    }
+    if (loginSubmitBtn) {
+        loginSubmitBtn.addEventListener('click', window.doLogin);
     }
 
     // Auto bypass login if on local touchscreen
     if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
         if (loginScreen) loginScreen.style.display = 'none';
         if (mainApp) mainApp.style.display = 'flex';
+        navigateToPage('dashboard');
     }
 
     // Sidebar toggle (Hamburger 3 horizontal lines)

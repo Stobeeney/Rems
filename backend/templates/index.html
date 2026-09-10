@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RECMS - Residential Energy Management and Control System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles_v4.css') }}?v=22">
+    <title>REMS - Residential Energy Management System</title>
+    <link rel="stylesheet" href="/static/styles_v4.css?v=22">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Chart.js for graphs -->
@@ -19,8 +19,8 @@
                     <i class="ph-fill ph-house"></i>
                     <i class="ph-fill ph-lightning bolt-icon"></i>
                 </div>
-                <h2 id="login-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Welcome to RECMS</h2>
-                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Development of an AI-Assisted Residential Energy<br>Management and Control System</p>
+                <h2 id="login-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Welcome to REMS</h2>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Development of an AI-Assisted Residential Energy<br>Management System</p>
             </div>
             <form id="login-form" class="login-form">
                 <div class="form-group">
@@ -32,7 +32,7 @@
                     <input type="password" id="login-password" class="form-control" placeholder="admin123" value="admin123" required>
                 </div>
                 <p id="login-error" class="login-error" style="display:none; color: #ef4444; font-size: 12px; margin-top: -8px; margin-bottom: 12px;">Invalid password</p>
-                <button type="submit" id="login-submit-btn" class="btn btn-primary" style="width: 100%; padding: 10px; font-size: 13px;">Sign In</button>
+                <button type="button" id="login-submit-btn" onclick="doLogin(event)" class="btn btn-primary" style="width: 100%; padding: 10px; font-size: 13px;">Sign In</button>
                 <p style="text-align: center; margin-top: 14px; font-size: 12px;">
                     <a href="#" id="toggle-register" style="color: var(--primary); text-decoration: none;">Don't have an account? Register</a>
                 </p>
@@ -44,15 +44,14 @@
     <div class="app-container" id="main-app" style="display: none;">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div>
-                <div class="logo-container">
+            <div class="sidebar-header">
+                <div class="logo">
                     <div class="logo-icon">
-                        <i class="ph-fill ph-house"></i>
-                        <i class="ph-fill ph-lightning bolt-icon"></i>
+                        <i class="ph-fill ph-lightning"></i>
                     </div>
-                    <div class="logo-text">
-                        <h1>RECMS</h1>
-                        <p>Development of an AI-Assisted Residential Energy<br>Management and Control System</p>
+                    <div>
+                        <h1>REMS</h1>
+                        <p>Development of an AI-Assisted Residential Energy<br>Management System</p>
                     </div>
                 </div>
 
@@ -945,7 +944,7 @@
                     </div>
                     <div class="form-group">
                         <label>System Name</label>
-                        <input type="text" class="form-control" value="RECMS" readonly>
+                        <input type="text" class="form-control" value="REMS" readonly>
                     </div>
                     <div class="form-group">
                         <label>Location</label>
@@ -997,7 +996,7 @@
     <!-- 7. ABOUT SYSTEM TEMPLATE -->
     <template id="tpl-about">
         <div class="card" style="padding: 24px;">
-            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">RECMS - Development of an AI-Assisted Residential Energy Management and Control System</h2>
+            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">REMS - Development of an AI-Assisted Residential Energy Management System</h2>
             <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px; line-height: 1.6;">
                 Developed for academic engineering thesis compliance featuring real-time multi-branch electrical telemetry, automated power factor correction, mmWave human presence adaptive load control, comprehensive safety interlocking, and AI-driven energy conservation recommendations.
             </p>
@@ -1076,6 +1075,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=24"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=25"></script>
 </body>
 </html>
