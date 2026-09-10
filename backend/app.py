@@ -67,12 +67,12 @@ for zone, pin in HLK_PINS.items():
         print(f"⚠️ Could not initialize HLK on GPIO {pin}: {e}")
 
 occupancy_state = {
-    "sensor": "HLK-LD2410B (24GHz mmWave)",
-    "pin": 14,
+    "sensor": "4x HLK-LD2410B (24GHz mmWave)",
     "detected": False,
     "status": "VACANT",
     "last_motion_time": time.time(),
     "vacancy_seconds": 0,
+    "active_zones_count": 0,
     "zones": {
         "zone1": {"name": "Living Room (GPIO 14)", "pin": 14, "detected": False, "status": "VACANT"},
         "zone2": {"name": "Master Bedroom (GPIO 15)", "pin": 15, "detected": False, "status": "VACANT"},
@@ -1016,12 +1016,13 @@ def esp32_serial_worker():
 # =============================================================================
 
 def occupancy_engine():
-    """Background engine monitoring HLK-LD2410B mmWave human presence (GPIO 14 primary tested)"""
+    """Background engine monitoring 4x HLK-LD2410B mmWave human presence sensors (GPIO 14, 15, 25, 26)"""
     global occupancy_state
     while True:
         try:
             now = time.time()
             any_detected = False
+            active_zones_count = 0
             for zone_key, pin in HLK_PINS.items():
                 sensor_dev = hlk_sensors.get(zone_key)
                 if sensor_dev is None:
@@ -1037,12 +1038,12 @@ def occupancy_engine():
                 zone_info["status"] = "OCCUPIED" if val else "VACANT"
                 if val:
                     any_detected = True
+                    active_zones_count += 1
 
-            # Primary tested sensor is zone 1 (GPIO 14)
-            prim_detected = occupancy_state["zones"]["zone1"]["detected"] or any_detected
-            occupancy_state["detected"] = prim_detected
+            occupancy_state["detected"] = any_detected
+            occupancy_state["active_zones_count"] = active_zones_count
             
-            if prim_detected:
+            if any_detected:
                 occupancy_state["last_motion_time"] = now
                 occupancy_state["vacancy_seconds"] = 0
                 occupancy_state["status"] = "OCCUPIED"
@@ -1054,11 +1055,11 @@ def occupancy_engine():
                         if not relay_status.get(r_id, False) and relays.get(r_id):
                             relays[r_id].on()
                             relay_status[r_id] = True
-                            print(f"🤖 [AI-Assisted]: HLK mmWave detected presence. Turned ON Relay {r_id}.")
+                            print(f"🤖 [AI-Assisted]: HLK mmWave detected presence ({active_zones_count} zones active). Turned ON Relay {r_id}.")
             else:
                 elapsed = int(now - occupancy_state.get("last_motion_time", now))
                 occupancy_state["vacancy_seconds"] = elapsed
-                if elapsed > 15:
+                if elapsed > 10:
                     occupancy_state["status"] = "VACANT"
                     
                 # In AI-Assisted Mode: Auto-turn OFF all sensor-linked relays after 2 minutes (120s) vacancy
@@ -1079,7 +1080,7 @@ def occupancy_engine():
                         c = conn.cursor()
                         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         c.execute("INSERT INTO suggestions (message, confidence, timestamp) VALUES (?, ?, ?)",
-                                  (f"No human presence detected for 2 minutes. Turn OFF motion-linked loads {linked_relays}?", "High (95%)", now_str))
+                                  (f"All 4 zones vacant for 2 minutes. Turn OFF motion-linked loads {linked_relays}?", "High (95%)", now_str))
                         conn.commit()
                         conn.close()
         except Exception:

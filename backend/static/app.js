@@ -547,55 +547,59 @@ setInterval(async () => {
                 chartLivePf.update('none');
             }
 
-            // HLK-LD2410B mmWave Presence Card Updates (Tested on GPIO 14 / Pin 8)
+            // HLK-LD2410B mmWave Presence Card Updates (4-Zone Support: Z1 Living, Z2 Master Bed, Z3 Bed 2, Z4 Kitchen)
             if (data.occupancy) {
                 const occ = data.occupancy;
-                const hlkDot = document.getElementById('hlk-pulse-dot');
-                const hlkText = document.getElementById('hlk-status-text');
-                const hlkTimer = document.getElementById('hlk-timer-text');
                 const hlkBadge = document.getElementById('hlk-status-badge');
+                const hlkTimer = document.getElementById('hlk-timer-text');
                 
                 const isOccupied = (occ.status === 'OCCUPIED' || occ.detected);
-                if (isOccupied) {
-                    if (hlkDot) {
-                        hlkDot.style.background = '#22c55e';
-                        hlkDot.style.boxShadow = '0 0 14px #22c55e';
-                    }
-                    if (hlkText) {
-                        hlkText.textContent = occ.detected ? 'OCCUPIED (MOTION DETECTED)' : 'OCCUPIED (PRESENCE / STILL)';
-                        hlkText.style.color = '#4ade80';
-                    }
-                    if (hlkBadge) {
+                
+                if (hlkBadge) {
+                    if (isOccupied) {
                         hlkBadge.textContent = 'OCCUPIED';
                         hlkBadge.style.background = 'rgba(34, 197, 94, 0.25)';
                         hlkBadge.style.color = '#86efac';
-                    }
-                    if (hlkTimer) {
-                        hlkTimer.textContent = occ.detected 
-                            ? 'Micro-motion / Presence active on GPIO 14 (Pin 8)'
-                            : `Presence maintained (Stationary for ${occ.vacancy_seconds || 0}s)`;
-                    }
-                } else {
-                    if (hlkDot) {
-                        hlkDot.style.background = '#94a3b8';
-                        hlkDot.style.boxShadow = 'none';
-                    }
-                    if (hlkText) {
-                        hlkText.textContent = 'VACANT';
-                        hlkText.style.color = '#ffffff';
-                    }
-                    if (hlkBadge) {
+                    } else {
                         hlkBadge.textContent = 'VACANT';
                         hlkBadge.style.background = 'rgba(148, 163, 184, 0.2)';
                         hlkBadge.style.color = '#cbd5e1';
                     }
-                    const remaining = Math.max(0, 120 - (occ.vacancy_seconds || 0));
-                    if (hlkTimer) {
+                }
+
+                // Update individual zones
+                const zones = occ.zones || {};
+                let activeCount = 0;
+                ['zone1', 'zone2', 'zone3', 'zone4'].forEach(zKey => {
+                    const zData = zones[zKey];
+                    const zDot = document.getElementById(`hlk-dot-${zKey}`);
+                    const zBadge = document.getElementById(`hlk-badge-${zKey}`);
+                    
+                    const zActive = zData ? (zData.detected || zData.status === 'OCCUPIED') : false;
+                    if (zActive) activeCount++;
+
+                    if (zDot) {
+                        zDot.style.background = zActive ? '#22c55e' : '#94a3b8';
+                        zDot.style.boxShadow = zActive ? '0 0 8px #22c55e' : 'none';
+                    }
+                    if (zBadge) {
+                        zBadge.textContent = zActive ? 'OCCUPIED' : 'VACANT';
+                        zBadge.style.background = zActive ? 'rgba(34, 197, 94, 0.25)' : 'rgba(148, 163, 184, 0.2)';
+                        zBadge.style.color = zActive ? '#86efac' : '#cbd5e1';
+                    }
+                });
+
+                if (hlkTimer) {
+                    if (isOccupied) {
+                        hlkTimer.textContent = `Active: ${activeCount}/4 Zones Occupied`;
+                    } else {
+                        const remaining = Math.max(0, 120 - (occ.vacancy_seconds || 0));
                         hlkTimer.textContent = remaining > 0 
-                            ? `Vacant for ${occ.vacancy_seconds || 0}s (Auto-OFF in ${remaining}s)`
-                            : `Vacant for ${occ.vacancy_seconds || 0}s (Auto-cutoff executed)`;
+                            ? `All Vacant: ${occ.vacancy_seconds || 0}s (Cutoff in ${remaining}s)` 
+                            : `All Vacant: Cutoff executed (${occ.vacancy_seconds || 0}s)`;
                     }
                 }
+            }
 
                 // Dynamically display which loads are linked to the presence sensor
                 if (data.sensor_linked_relays) {

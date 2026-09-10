@@ -174,27 +174,70 @@
                     </div>
                 </div>
 
-                <!-- Card B: HLK-LD2410B mmWave Human Presence Sensor -->
-                <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-color: rgba(34,197,94,0.3);">
+                <!-- Card B: 4-Zone HLK-LD2410B mmWave Human Presence Monitor -->
+                <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-color: rgba(34,197,94,0.3); padding: 14px;">
                     <div class="card-header" style="margin-bottom: 6px;">
-                        <h3 style="display: flex; align-items: center; gap: 6px;">
-                            <i class="ph-fill ph-radar" style="color: var(--primary);"></i> HLK-LD2410B mmWave PRESENCE
+                        <h3 style="display: flex; align-items: center; gap: 6px; font-size: 13px;">
+                            <i class="ph-fill ph-radar" style="color: var(--primary);"></i> 4-ZONE mmWave PRESENCE
                         </h3>
-                        <span style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">GPIO 14 (Pin 8)</span>
+                        <span class="badge-pill" id="hlk-status-badge" style="background: rgba(34,197,94,0.2); color: #86efac; font-size: 10px; font-weight: 700;">OCCUPIED</span>
                     </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 2px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div id="hlk-pulse-dot" style="width: 14px; height: 14px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 10px #22c55e;"></div>
-                            <div>
-                                <div style="font-size: 16px; font-weight: 800; color: #ffffff;" id="hlk-status-text">OCCUPIED</div>
-                                <div style="font-size: 11px; color: var(--text-muted);" id="hlk-timer-text">Human presence active</div>
+                    
+                    <!-- 4-Zone Compact Matrix -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0;">
+                        <!-- Zone 1: Living Room -->
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <div id="hlk-dot-zone1" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e; flex-shrink: 0;"></div>
+                                <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 11px; font-weight: 700; color: #ffffff;">Z1: Living Room</div>
+                                    <div style="font-size: 9px; color: var(--text-muted);">GPIO 14 (Pin 8)</div>
+                                </div>
                             </div>
+                            <span class="badge-pill" id="hlk-badge-zone1" style="font-size: 9px; padding: 2px 5px; font-weight: 800; background: rgba(34,197,94,0.2); color: #86efac; flex-shrink: 0;">OCCUPIED</span>
                         </div>
-                        <span class="badge-pill" id="hlk-status-badge" style="background: rgba(34,197,94,0.2); color: #86efac; font-size: 11px; font-weight: 700;">OCCUPIED</span>
+
+                        <!-- Zone 2: Master Bedroom -->
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <div id="hlk-dot-zone2" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; flex-shrink: 0;"></div>
+                                <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 11px; font-weight: 700; color: #ffffff;">Z2: Master Bed</div>
+                                    <div style="font-size: 9px; color: var(--text-muted);">GPIO 15 (Pin 10)</div>
+                                </div>
+                            </div>
+                            <span class="badge-pill" id="hlk-badge-zone2" style="font-size: 9px; padding: 2px 5px; font-weight: 800; background: rgba(148,163,184,0.2); color: #cbd5e1; flex-shrink: 0;">VACANT</span>
+                        </div>
+
+                        <!-- Zone 3: Bedroom 2 -->
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <div id="hlk-dot-zone3" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; flex-shrink: 0;"></div>
+                                <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 11px; font-weight: 700; color: #ffffff;">Z3: Bed 2</div>
+                                    <div style="font-size: 9px; color: var(--text-muted);">GPIO 25 (Pin 22)</div>
+                                </div>
+                            </div>
+                            <span class="badge-pill" id="hlk-badge-zone3" style="font-size: 9px; padding: 2px 5px; font-weight: 800; background: rgba(148,163,184,0.2); color: #cbd5e1; flex-shrink: 0;">VACANT</span>
+                        </div>
+
+                        <!-- Zone 4: Kitchen -->
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <div id="hlk-dot-zone4" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; flex-shrink: 0;"></div>
+                                <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <div style="font-size: 11px; font-weight: 700; color: #ffffff;">Z4: Kitchen</div>
+                                    <div style="font-size: 9px; color: var(--text-muted);">GPIO 26 (Pin 37)</div>
+                                </div>
+                            </div>
+                            <span class="badge-pill" id="hlk-badge-zone4" style="font-size: 9px; padding: 2px 5px; font-weight: 800; background: rgba(148,163,184,0.2); color: #cbd5e1; flex-shrink: 0;">VACANT</span>
+                        </div>
                     </div>
-                    <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
-                        <span>Auto-Link: Relay 4 (LR Lights)</span>
-                        <span id="hlk-auto-status" style="color: var(--primary);">Tested Pin 14 Active</span>
+
+                    <!-- Bottom Status -->
+                    <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                        <span id="hlk-timer-text">Active: 1/4 Zones Occupied</span>
+                        <span id="hlk-auto-status" style="color: var(--primary);">Auto-OFF Timeout: 2m</span>
                     </div>
                 </div>
 
@@ -966,7 +1009,7 @@
                         <li>Sub-Controller: ESP32 with 16-Channel MUX (74HC4067)</li>
                         <li>Power Monitors: 11x PZEM-004T AC Monitors (Main + 10 Branches)</li>
                         <li>Actuators: 20x 1-Channel Relay Modules (Active-Low) + CJX2-1210 Contactor</li>
-                        <li>Sensors: DS3231 I2C RTC, HLK-LD2410B 24GHz mmWave Presence Sensor</li>
+                        <li>Sensors: DS3231 I2C RTC, 4x HLK-LD2410B 24GHz mmWave Presence Sensors</li>
                         <li>Protection: ACU Compressor Hardware Interlock & Critical Load Guard</li>
                     </ul>
                 </div>
@@ -1017,7 +1060,7 @@
                         <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
                             <i class="ph-fill ph-radar" style="color: var(--primary);"></i> HLK-LD2410B Presence Link
                         </div>
-                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Awtomatikong mag-o-ON kapag may na-detect na tao</div>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Automatically energize load upon mmWave human presence detection</div>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="edit-device-sensor-link">
@@ -1033,6 +1076,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=23"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=24"></script>
 </body>
 </html>
