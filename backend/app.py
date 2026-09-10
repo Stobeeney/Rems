@@ -91,6 +91,8 @@ DB_FILE = 'rems.db'
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    c.execute("PRAGMA journal_mode=WAL;")
+    c.execute("PRAGMA synchronous=NORMAL;")
     # Create tables if they don't exist
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
