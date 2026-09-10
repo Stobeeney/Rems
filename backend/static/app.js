@@ -809,6 +809,32 @@ window.setSystemMode = async function(mode) {
 };
 
 
+// Helper to update displayed user and role across the UI
+window.updateUserProfile = function(username, role) {
+    const roleEl = document.getElementById('display-role');
+    const dropU = document.getElementById('dropdown-username');
+    const dropR = document.getElementById('dropdown-role');
+
+    const rawUser = username || 'Admin';
+    const rawRole = role || 'admin';
+    const uName = rawUser.charAt(0).toUpperCase() + rawUser.slice(1);
+    const uRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
+
+    if (roleEl) {
+        if (rawRole.toLowerCase() === 'admin') {
+            roleEl.textContent = rawUser.toLowerCase() === 'admin' ? 'Admin' : `${uName} (Admin)`;
+        } else {
+            roleEl.textContent = `${uName} (${uRole})`;
+        }
+    }
+    if (dropU) dropU.textContent = uName;
+    if (dropR) dropR.textContent = `Role: ${uRole}`;
+
+    try {
+        localStorage.setItem('rems_user', JSON.stringify({ username: rawUser, role: rawRole }));
+    } catch (e) {}
+};
+
 // Global Login Handler
 window.doLogin = async function(e) {
     if (e && e.preventDefault) e.preventDefault();
@@ -829,6 +855,13 @@ window.doLogin = async function(e) {
         });
         const data = await res.json();
         if (res.ok && data.success) {
+            const loggedInUser = data.username || username;
+            const loggedInRole = data.role || 'user';
+            window.updateUserProfile(loggedInUser, loggedInRole);
+            try {
+                sessionStorage.removeItem('rems_logged_out');
+            } catch (err) {}
+
             if (loginScreen) loginScreen.style.display = 'none';
             if (mainApp) mainApp.style.display = 'flex';
             navigateToPage('dashboard');
@@ -840,6 +873,7 @@ window.doLogin = async function(e) {
         }
     } catch (err) {
         // Fallback for local connection
+        window.updateUserProfile(username, 'user');
         if (loginScreen) loginScreen.style.display = 'none';
         if (mainApp) mainApp.style.display = 'flex';
         navigateToPage('dashboard');
@@ -967,8 +1001,21 @@ document.addEventListener('DOMContentLoaded', () => {
         registerSubmitBtn.addEventListener('click', window.doRegister);
     }
 
-    // Auto bypass login if on local touchscreen
-    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+    // Restore saved user or default to Admin
+    let savedUser = null;
+    try {
+        savedUser = JSON.parse(localStorage.getItem('rems_user'));
+    } catch (e) {}
+
+    if (savedUser && savedUser.username) {
+        window.updateUserProfile(savedUser.username, savedUser.role);
+    } else {
+        window.updateUserProfile('Admin', 'admin');
+    }
+
+    // Auto bypass login if on local touchscreen unless user deliberately logged out
+    const isLoggedOut = sessionStorage.getItem('rems_logged_out') === 'true';
+    if (!isLoggedOut && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')) {
         if (loginScreen) loginScreen.style.display = 'none';
         if (mainApp) mainApp.style.display = 'flex';
         navigateToPage('dashboard');
@@ -996,8 +1043,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            try {
+                sessionStorage.setItem('rems_logged_out', 'true');
+                localStorage.removeItem('rems_user');
+            } catch (e) {}
+            window.updateUserProfile('Admin', 'admin');
+            const uInput = document.getElementById('login-username');
+            const pInput = document.getElementById('login-password');
+            if (uInput) uInput.value = '';
+            if (pInput) pInput.value = '';
             mainApp.style.display = 'none';
             loginScreen.style.display = 'flex';
+            window.toggleAuthMode('login');
         });
     }
 

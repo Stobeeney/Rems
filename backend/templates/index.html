@@ -145,7 +145,7 @@
                     <button class="icon-btn" onclick="navigateToPage('alerts')">
                         <i class="ph ph-bell"></i>
                     </button>
-                    <div class="user-profile" id="user-profile-btn">
+                    <div class="user-profile" id="user-profile-btn" style="cursor: pointer; position: relative;">
                         <div class="avatar">
                             <i class="ph-fill ph-user"></i>
                         </div>
@@ -154,6 +154,10 @@
                         
                         <!-- Profile Dropdown -->
                         <div class="profile-dropdown" id="profile-dropdown">
+                            <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); text-align: left;">
+                                <div id="dropdown-username" style="font-size: 12px; font-weight: 700; color: #ffffff;">Admin</div>
+                                <div id="dropdown-role" style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">ADMINISTRATOR</div>
+                            </div>
                             <ul>
                                 <li id="logout-btn">
                                     <i class="ph ph-sign-out"></i>
@@ -1098,6 +1102,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=27"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=28"></script>
 </body>
 </html>

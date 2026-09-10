@@ -263,7 +263,7 @@ def login():
     conn.close()
     
     if user:
-        return jsonify({"success": True, "message": "Login successful", "role": user[0]})
+        return jsonify({"success": True, "message": "Login successful", "role": user[0], "username": username})
     else:
         return jsonify({"success": False, "message": "Invalid username or password"}), 401
 
