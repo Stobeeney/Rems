@@ -22,6 +22,7 @@ function navigateToPage(pageId) {
     const template = document.getElementById(templateId);
     
     contentArea.innerHTML = '';
+    contentArea.scrollTop = 0;
     
     if (template) {
         contentArea.appendChild(template.content.cloneNode(true));
@@ -114,26 +115,53 @@ let DEVICE_MAPPING = [
     { id: 1, name: "PFC Capacitor Bank 1 (K1)", room: "Main Panel", pin: "Pin 11 (GPIO 17)", power: 0.00 },
     { id: 2, name: "PFC Capacitor Bank 2 (K2)", room: "Main Panel", pin: "Pin 13 (GPIO 27)", power: 0.00 },
     { id: 3, name: "PFC Capacitor Bank 3 (K3)", room: "Main Panel", pin: "Pin 15 (GPIO 22)", power: 0.00 },
-    { id: 4, name: "Living Room Lights", room: "Living Room", pin: "Pin 7 (GPIO 4)", power: 0.00 },
+    { id: 4, name: "Living Room Lights", room: "Living Room", pin: "Pin 7 (GPIO 4)", power: 0.00, three_way: true },
     { id: 5, name: "Living Room TV", room: "Living Room", pin: "Pin 29 (GPIO 5)", power: 0.00 },
     { id: 6, name: "Outlet Group 1", room: "Living Room", pin: "Pin 31 (GPIO 6)", power: 0.00 },
     { id: 7, name: "Air Conditioner Main (ACU)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00 },
-    { id: 8, name: "Bedroom 1 Lights", room: "Master Bedroom", pin: "Pin 24 (GPIO 8)", power: 0.00 },
+    { id: 8, name: "Bedroom 1 Lights", room: "Master Bedroom", pin: "Pin 24 (GPIO 8)", power: 0.00, three_way: true },
     { id: 9, name: "Bedroom 1 Outlet Group 2", room: "Master Bedroom", pin: "Pin 21 (GPIO 9)", power: 0.00 },
     { id: 10, name: "Refrigerator (Critical)", room: "Kitchen", pin: "Pin 19 (GPIO 10)", power: 0.00 },
     { id: 11, name: "Kitchen Outlets", room: "Kitchen", pin: "Pin 23 (GPIO 11)", power: 0.00 },
     { id: 12, name: "Water Heater", room: "Bathroom", pin: "Pin 32 (GPIO 12)", power: 0.00 },
     { id: 13, name: "Washing Machine", room: "Laundry Area", pin: "Pin 33 (GPIO 13)", power: 0.00 },
     { id: 14, name: "Microwave Oven", room: "Kitchen", pin: "Pin 36 (GPIO 16)", power: 0.00 },
-    { id: 15, name: "Garage Door & Lights", room: "Garage", pin: "Pin 12 (GPIO 18)", power: 0.00 },
-    { id: 16, name: "Dining Room Lighting", room: "Dining Room", pin: "Pin 35 (GPIO 19)", power: 0.00 },
-    { id: 17, name: "Outdoor Security Lights", room: "Outdoor / Garden", pin: "Pin 38 (GPIO 20)", power: 0.00 },
+    { id: 15, name: "Garage Door & Lights", room: "Garage", pin: "Pin 12 (GPIO 18)", power: 0.00, three_way: true },
+    { id: 16, name: "Dining Room Lighting", room: "Dining Room", pin: "Pin 35 (GPIO 19)", power: 0.00, three_way: true },
+    { id: 17, name: "Outdoor Security Lights", room: "Outdoor / Garden", pin: "Pin 38 (GPIO 20)", power: 0.00, three_way: true },
     { id: 18, name: "CCTV / Security NVR", room: "Main Panel", pin: "Pin 40 (GPIO 21)", power: 0.00 },
     { id: 19, name: "Standby Outlets", room: "Living Room", pin: "Pin 16 (GPIO 23)", power: 0.00 },
     { id: 20, name: "Auxiliary Branch", room: "Main Panel", pin: "Pin 18 (GPIO 24)", power: 0.00 }
 ];
 
 let currentRelayStates = {};
+let currentLightStates = {};   // 3-way lights: { id: {state, sensed, current} } from PZEM current
+let pendingLightToggles = {};  // 3-way lights waiting for the next reading after a toggle
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+// 3-way lights report the real lamp state, not the relay contact position
+function isThreeWay(relayId) {
+    const dev = DEVICE_MAPPING.find(d => d.id === relayId);
+    return !!(dev && dev.three_way);
+}
+
+function effectiveRelayState(relayId, relays, lights) {
+    const light = lights && lights[String(relayId)];
+    if (light && isThreeWay(relayId)) return light.state;
+    return (relays && relays[String(relayId)]) || 'OFF';
+}
+
+function lightStateLabel(relayId) {
+    if (pendingLightToggles[relayId]) return 'SWITCHING…';
+    const light = currentLightStates[String(relayId)];
+    const st = effectiveRelayState(relayId, currentRelayStates, currentLightStates);
+    return `${st}${light && !light.sensed ? ' (est.)' : ''}`;
+}
 let currentLoadMode = "MANUAL";
 
 // Fetch custom device names and rooms from DB
@@ -156,11 +184,19 @@ function initLoadControlTable() {
     
     tbody.innerHTML = '';
     DEVICE_MAPPING.forEach(dev => {
-        const isChecked = currentRelayStates[dev.id] === 'ON';
+        const isChecked = effectiveRelayState(dev.id, currentRelayStates, currentLightStates) === 'ON';
         const isProtected = [1, 2, 3, 10, 18].includes(dev.id);
         const roomOptionsHtml = DEDICATED_ROOMS.map(r => 
-            `<option value="${r}" ${dev.room === r ? 'selected' : ''}>${r}</option>`
+            `<option value="${escapeHtml(r)}" ${dev.room === r ? 'selected' : ''}>${escapeHtml(r)}</option>`
         ).join('');
+        const switchHtml = dev.three_way ? `
+                <button class="btn-light-toggle ${isChecked ? 'is-on' : ''}" id="light-btn-${dev.id}" onclick="toggleThreeWayLight(${dev.id})" title="3-way light: the wall switch also works">
+                    <i class="ph-fill ph-lightbulb"></i> TOGGLE
+                </button>` : `
+                <label class="switch">
+                    <input type="checkbox" id="switch-relay-${dev.id}" ${isChecked ? 'checked' : ''} onchange="toggleRelayDevice(${dev.id}, this.checked)">
+                    <span class="slider"></span>
+                </label>`;
 
         let sensorLinkHtml = '';
         if (isProtected) {
@@ -184,11 +220,12 @@ function initLoadControlTable() {
             <td style="padding: 12px 18px; font-weight: 600;">
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <i class="ph-fill ph-circle" style="font-size: 8px; color: ${isChecked ? 'var(--primary)' : '#ef4444'};" id="dot-relay-${dev.id}"></i>
-                    <span id="name-relay-${dev.id}" style="cursor: pointer;" onclick="openEditDeviceModal(${dev.id})" title="Click to rename">${dev.name}</span>
+                    <span id="name-relay-${dev.id}" style="cursor: pointer;" onclick="openEditDeviceModal(${dev.id})" title="Click to rename">${escapeHtml(dev.name)}</span>
                     <button class="btn-icon-rename" onclick="openEditDeviceModal(${dev.id})" title="Rename Device">
                         <i class="ph ph-pencil-simple"></i>
                     </button>
-                    <span style="font-size: 10px; color: #8b949e; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${dev.pin}</span>
+                    <span style="font-size: 10px; color: #8b949e; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(dev.pin)}</span>
+                    ${dev.three_way ? '<span class="badge-3way" title="Electrical 3-way: relay + wall switch">3-WAY</span>' : ''}
                 </div>
             </td>
             <td>
@@ -199,17 +236,13 @@ function initLoadControlTable() {
             <td style="font-weight: 700; color: #ffffff;" id="pwr-relay-${dev.id}">${isChecked ? dev.power.toFixed(2) : '0.00'}</td>
             <td>
                 <span id="stat-text-relay-${dev.id}" style="font-weight: 700; color: ${isChecked ? 'var(--primary)' : 'var(--text-muted)'};">
-                    ${isChecked ? 'ON' : 'OFF'}
+                    ${dev.three_way ? lightStateLabel(dev.id) : (isChecked ? 'ON' : 'OFF')}
                 </span>
             </td>
             <td>
                 ${sensorLinkHtml}
             </td>
-            <td>
-                <label class="switch">
-                    <input type="checkbox" id="switch-relay-${dev.id}" ${isChecked ? 'checked' : ''} onchange="toggleRelayDevice(${dev.id}, this.checked)">
-                    <span class="slider"></span>
-                </label>
+            <td>${switchHtml}
             </td>
             <td style="text-align: right; padding-right: 18px;">
                 <button class="btn-icon-rename" onclick="openEditDeviceModal(${dev.id})" title="Edit Settings">
@@ -402,19 +435,60 @@ function updateRelayUIElement(relayId, stateStr) {
     const statText = document.getElementById(`stat-text-relay-${relayId}`);
     const pwr = document.getElementById(`pwr-relay-${relayId}`);
     const sw = document.getElementById(`switch-relay-${relayId}`);
+    const lightBtn = document.getElementById(`light-btn-${relayId}`);
     
     const isON = stateStr === 'ON';
     if (dot) dot.style.color = isON ? 'var(--primary)' : '#ef4444';
     if (statText) {
-        statText.textContent = stateStr;
+        statText.textContent = isThreeWay(relayId) ? lightStateLabel(relayId) : stateStr;
         statText.style.color = isON ? 'var(--primary)' : 'var(--text-muted)';
     }
     if (sw) sw.checked = isON;
+    if (lightBtn) {
+        lightBtn.classList.toggle('is-on', isON);
+        lightBtn.classList.toggle('pending', !!pendingLightToggles[relayId]);
+    }
     if (pwr) {
         const dev = DEVICE_MAPPING.find(d => d.id === relayId);
         if (dev) pwr.textContent = isON ? dev.power.toFixed(2) : '0.00';
     }
 }
+
+function applyLightStates(lights) {
+    Object.entries(lights).forEach(([id, light]) => {
+        const pending = pendingLightToggles[id];
+        // Clear "SWITCHING…" once the lamp state changes, or after 6 s without a change
+        if (pending && (light.state !== pending.from || Date.now() - pending.at > 6000 || !light.sensed)) {
+            delete pendingLightToggles[id];
+        }
+    });
+    currentLightStates = lights;
+}
+
+// 3-Way Light: flip the relay contact (the wall switch can flip it too)
+window.toggleThreeWayLight = async function(relayId) {
+    if (pendingLightToggles[relayId]) return;
+    pendingLightToggles[relayId] = {
+        from: effectiveRelayState(relayId, currentRelayStates, currentLightStates),
+        at: Date.now()
+    };
+    updateRelayUIElement(relayId, pendingLightToggles[relayId].from);
+    try {
+        const res = await fetch('/api/relay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'toggle', relay_id: relayId, module: 'load' })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            delete pendingLightToggles[relayId];
+            alert(data.message || 'Could not toggle the light.');
+        }
+    } catch (e) {
+        delete pendingLightToggles[relayId];
+        console.error("Error toggling 3-way light:", e);
+    }
+};
 
 // Background status poller (Syncs backend state with UI)
 setInterval(async () => {
@@ -424,11 +498,12 @@ setInterval(async () => {
         if (data.success) {
             currentRelayStates = data.relays;
             currentLoadMode = data.load_mode || 'AUTO';
+            applyLightStates(data.lights || {});
             
             let onCount = 0;
             let offCount = 0;
             for (let i = 1; i <= 20; i++) {
-                const st = data.relays[i] || 'OFF';
+                const st = effectiveRelayState(i, data.relays, currentLightStates);
                 if (st === 'ON') onCount++; else offCount++;
                 updateRelayUIElement(i, st);
             }
@@ -661,7 +736,7 @@ setInterval(async () => {
                 // Active Devices Badge Count
                 let activeRelays = 0;
                 for (let r = 1; r <= 20; r++) {
-                    if (data.relays[String(r)] === 'ON') activeRelays++;
+                    if (effectiveRelayState(r, data.relays, data.lights) === 'ON') activeRelays++;
                 }
                 const navBadge = document.getElementById('nav-active-count');
                 const totalActiveEl = document.getElementById('active-devices-total-count');
@@ -732,8 +807,8 @@ window.renderActiveDevicesPage = async function() {
             <div class="card" style="padding: 16px; border: 1px solid rgba(34,197,94,0.3); background: rgba(34,197,94,0.03); display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div>
-                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Relay #${d.id} • ${d.room}</div>
-                        <div style="font-size: 15px; font-weight: 800; color: #ffffff; margin-top: 2px;">${d.name}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Relay #${d.id} • ${escapeHtml(d.room)}</div>
+                        <div style="font-size: 15px; font-weight: 800; color: #ffffff; margin-top: 2px;">${escapeHtml(d.name)}</div>
                     </div>
                     <span class="badge-pill" style="background: rgba(34,197,94,0.2); color: #4ade80; font-size: 10px; font-weight: 800;">
                         <i class="ph-fill ph-check-circle"></i> ACTIVE
@@ -741,7 +816,7 @@ window.renderActiveDevicesPage = async function() {
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; font-size: 11px;">
-                    <span style="color: var(--text-muted);">${d.pin || ''}</span>
+                    <span style="color: var(--text-muted);">${escapeHtml(d.pin || '')}</span>
                     <span style="font-weight: 700; color: var(--primary);">${parseFloat(d.power || 0).toFixed(2)} kW</span>
                 </div>
 
@@ -1028,6 +1103,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebarToggleBtn.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
         });
+        // On the 7" kiosk the sidebar overlays the page, so start hidden
+        if (isCompactScreen()) sidebar.classList.add('collapsed');
     }
 
     // Sidebar navigation click handlers
@@ -1036,6 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', function() {
             const pageId = this.getAttribute('data-page');
             navigateToPage(pageId);
+            if (sidebar && isCompactScreen()) sidebar.classList.add('collapsed');
         });
     });
 
@@ -1885,3 +1963,85 @@ window.syncRtcTime = async function() {
     }
 };
 
+
+// =============================================================================
+// Kiosk Display Size (7" 1024x600 touchscreen)
+// =============================================================================
+const DISPLAY_SCALE_KEY = 'remsDisplayScale';
+
+function isCompactScreen() {
+    return window.matchMedia('(max-width: 1100px)').matches;
+}
+
+function currentDisplayScale() {
+    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+}
+
+function markDisplayScaleButtons() {
+    const scale = currentDisplayScale();
+    document.querySelectorAll('#display-size-group .btn').forEach(btn => {
+        btn.classList.toggle('active', Math.abs(parseFloat(btn.dataset.scale) - scale) < 0.01);
+    });
+}
+
+function applyDisplayScale(scale) {
+    if (scale) {
+        document.documentElement.style.setProperty('--ui-scale', scale);
+    } else {
+        document.documentElement.style.removeProperty('--ui-scale');
+    }
+    markDisplayScaleButtons();
+    // Charts measure their container; let them re-fit to the new size
+    window.dispatchEvent(new Event('resize'));
+}
+
+window.setDisplayScale = function(scale) {
+    try { localStorage.setItem(DISPLAY_SCALE_KEY, String(scale)); } catch (e) {}
+    applyDisplayScale(scale);
+};
+
+(function restoreDisplayScale() {
+    let saved = null;
+    try { saved = parseFloat(localStorage.getItem(DISPLAY_SCALE_KEY)); } catch (e) {}
+    if (saved && saved >= 0.8 && saved <= 2) {
+        document.documentElement.style.setProperty('--ui-scale', saved);
+    }
+})();
+
+// Settings page is rendered from a template; highlight the active size once it is on screen
+new MutationObserver(() => {
+    if (document.getElementById('display-size-group')) markDisplayScaleButtons();
+}).observe(document.body, { childList: true, subtree: true });
+
+// =============================================================================
+// Exit Fullscreen (kiosk touchscreen has no keyboard for F11 / Alt+F4)
+// =============================================================================
+function isPiLocalScreen() {
+    return ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+}
+
+function updateExitKioskButton() {
+    const btn = document.getElementById('exit-kiosk-btn');
+    if (btn) btn.style.display = (isPiLocalScreen() || document.fullscreenElement) ? 'inline-flex' : 'none';
+}
+
+window.exitKioskFullscreen = async function() {
+    // Fullscreen entered by the page itself can be left directly
+    if (document.fullscreenElement) {
+        try { await document.exitFullscreen(); } catch (e) {}
+        return;
+    }
+    if (!confirm('Exit fullscreen?\n\nThis closes the kiosk browser and shows the Raspberry Pi desktop. REMS keeps running in the background.')) return;
+    try {
+        const res = await fetch('/api/kiosk/exit', { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) {
+            alert((data.message || 'Could not exit fullscreen.') + '\n\nWith a keyboard: press F11, or Alt+F4 to close the browser.');
+        }
+    } catch (e) {
+        // The browser is closing; the connection dropping here is expected
+    }
+};
+
+document.addEventListener('fullscreenchange', updateExitKioskButton);
+updateExitKioskButton();

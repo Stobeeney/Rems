@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+        usesCleartextTraffic stays enabled because the Pi's LAN IP is not known at build time
+        and network_security_config cannot whitelist IP ranges. MainActivity enforces the policy
+        instead: http:// is only accepted for private LAN addresses, and navigation outside the
+        configured server origin is handed to the external browser.
+    -->
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

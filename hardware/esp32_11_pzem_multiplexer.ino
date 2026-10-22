@@ -8,7 +8,7 @@
 
 // PZEM Serial Communication Pins (HardwareSerial 1)
 #define PZEM_RX_PIN 19 // ESP32 RX <- MUX SIG <- PZEM TX
-#define PZEM_TX_PIN 18 // ESP32 TX -> Level Converter -> PZEM RX (Shared)
+#define PZEM_TX_PIN 18 // ESP32 TX -> PZEM RX of all 11 PZEMs (shared bus, 3.3V logic)
 
 // 11 PZEMs: C0 (Main Panel) + C1 to C10 (10 Branches)
 #define TOTAL_PZEM_CHANNELS 11

@@ -38,8 +38,16 @@ if [ -z "$CLOUDFLARED_BIN" ]; then
     echo "✅ Installed cloudflared to $CLOUDFLARED_BIN"
 fi
 
-# 2. Check if Named Tunnel Token is provided in environment or .env
+# 2. Check if Named Tunnel Token is provided in environment or backend/.env
+# (for a permanent setup, prefer deploy/setup-cloudflare-tunnel.sh which runs it as a boot service)
+if [ -z "$CLOUDFLARE_TUNNEL_TOKEN" ] && [ -f "$SCRIPT_DIR/backend/.env" ]; then
+    CLOUDFLARE_TUNNEL_TOKEN=$(grep -E '^CLOUDFLARE_TUNNEL_TOKEN=' "$SCRIPT_DIR/backend/.env" | tail -n 1 | cut -d= -f2- | tr -d '"'"'")
+fi
 if [ -n "$CLOUDFLARE_TUNNEL_TOKEN" ]; then
+    if systemctl is-active --quiet cloudflared 2>/dev/null; then
+        echo "✅ Named tunnel already running as the cloudflared system service. Nothing to do."
+        exit 0
+    fi
     echo "🔒 Launching Named Cloudflare Tunnel with provided token..."
     exec "$CLOUDFLARED_BIN" tunnel run --token "$CLOUDFLARE_TUNNEL_TOKEN"
 fi

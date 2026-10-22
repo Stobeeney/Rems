@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#0a0e17">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>REMS Mobile - Energy Management</title>
+    <title>REMCS Mobile - Energy Management</title>
     
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- PWA Manifest -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <!-- Mobile Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=3">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
                 <i class="ph-fill ph-lightning"></i>
             </div>
             <div class="brand-info">
-                <h1>REMS <span>IoT</span></h1>
+                <h1>REMCS <span>IoT</span></h1>
                 <p id="m-current-time">Connecting...</p>
             </div>
         </div>
@@ -87,6 +87,26 @@
                     </div>
                     <div class="sub-val blue" id="metric-pf-val">0.00</div>
                 </div>
+            </div>
+
+            <!-- System Operating Mode (same 3 modes as the kiosk) -->
+            <div class="m-card" style="margin-top: 12px;">
+                <div class="m-card-header">
+                    <span class="m-card-title"><i class="ph-fill ph-shield-check"></i> System Mode</span>
+                    <span class="sys-mode-pill" id="sys-mode-pill">MANUAL</span>
+                </div>
+                <div class="sys-mode-bar">
+                    <button class="sys-mode-btn" id="sys-mode-btn-MANUAL" onclick="setSystemMode('MANUAL')">
+                        <i class="ph-fill ph-hand-pointing"></i><span>Manual</span>
+                    </button>
+                    <button class="sys-mode-btn" id="sys-mode-btn-AI_ASSISTED" onclick="setSystemMode('AI_ASSISTED')">
+                        <i class="ph-fill ph-sparkle"></i><span>AI-Assist</span>
+                    </button>
+                    <button class="sys-mode-btn security" id="sys-mode-btn-SECURITY" onclick="setSystemMode('SECURITY')">
+                        <i class="ph-fill ph-lock-key"></i><span>Security</span>
+                    </button>
+                </div>
+                <p class="sys-mode-desc" id="sys-mode-desc">Manual control. Relays stay in current positions without automated tripping.</p>
             </div>
 
             <!-- Quick Modes Banner -->
@@ -179,7 +199,7 @@
                     <span class="m-card-title"><i class="ph ph-info"></i> System Information</span>
                 </div>
                 <div style="font-size:12px; line-height:1.8; color:var(--text-secondary);">
-                    <div><strong>Project:</strong> REMS (AI-Assisted Residential Energy Management)</div>
+                    <div><strong>Project:</strong> REMCS (AI-Assisted Residential Energy Management Control System)</div>
                     <div><strong>Host:</strong> Raspberry Pi 5 (Debian Linux ARM64)</div>
                     <div><strong>Sensors:</strong> 11x PZEM-004T v3.0 via CD74HC4067 MUX</div>
                     <div><strong>Actuators:</strong> 20-Channel Optocoupled Relay Board</div>
@@ -232,7 +252,22 @@
         </a>
     </nav>
 
+    <!-- Edit Device (name / room) Bottom Sheet -->
+    <div class="sheet-backdrop" id="edit-sheet-backdrop" onclick="closeEditSheet()"></div>
+    <div class="edit-sheet" id="edit-sheet" role="dialog" aria-labelledby="edit-sheet-title">
+        <div class="sheet-handle"></div>
+        <h3 id="edit-sheet-title"><i class="ph ph-pencil-simple"></i> Edit Device <span id="edit-sheet-id"></span></h3>
+        <label for="edit-name-input">Device Name</label>
+        <input type="text" id="edit-name-input" maxlength="40" autocomplete="off" placeholder="e.g. Living Room Lights">
+        <label for="edit-room-select">Room</label>
+        <select id="edit-room-select"></select>
+        <div class="sheet-actions">
+            <button class="btn-sugg btn-sugg-dismiss" onclick="closeEditSheet()">Cancel</button>
+            <button class="btn-sugg btn-sugg-apply" onclick="saveEditSheet()">Save</button>
+        </div>
+    </div>
+
     <!-- Mobile Scripts -->
-    <script src="{{ url_for('static', filename='mobile.js') }}?v=1"></script>
+    <script src="{{ url_for('static', filename='mobile.js') }}?v=3"></script>
 </body>
 </html>

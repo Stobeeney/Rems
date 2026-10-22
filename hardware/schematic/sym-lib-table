@@ -1,0 +1,4 @@
+(sym_lib_table
+(version 7)
+(lib (name "REMS")(type "KiCad")(uri "${KIPRJMOD}/REMS.kicad_sym")(options "")(descr "REMS custom symbols"))
+)

@@ -16,3 +16,16 @@ __pycache__/
 Thumbs.db
 *.log
 backend/*.log
+
+# Android / Gradle
+android_app/.gradle/
+android_app/build/
+android_app/app/build/
+android_app/local.properties
+android_app/.idea/
+*.apk
+
+# KiCad local files
+*.kicad_prl
+*-backups/
+fp-info-cache

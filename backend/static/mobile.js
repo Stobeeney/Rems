@@ -1,4 +1,4 @@
-// REMS Mobile Frontend Controller
+// REMCS Mobile Frontend Controller
 // Real-time telemetry, relay control, PZEM branches, and AI recommendations
 
 let activeTab = 'overview';
@@ -7,6 +7,22 @@ let relayStates = {};
 let pfcMode = 'AUTO';
 let loadMode = 'AUTO';
 let currentFilter = 'all';
+let lightStates = {};      // 3-way lights: { id: {state, sensed, current} }
+let pendingToggles = {};   // 3-way lights waiting for the next reading after a toggle
+let systemMode = 'MANUAL';
+let roomOptions = [];
+
+const SYSTEM_MODE_DESC = {
+    MANUAL: 'Manual control. Relays stay in current positions without automated tripping.',
+    AI_ASSISTED: 'AI mode active: Automated lighting via HLK mmWave and PFC interlocks.',
+    SECURITY: 'Security mode: Non-critical outlets cut off. Security monitoring on.'
+};
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -63,6 +79,7 @@ async function loadDevices() {
         if (res.ok) {
             const data = await res.json();
             devicesList = Array.isArray(data) ? data : (data.devices || []);
+            if (Array.isArray(data.rooms)) roomOptions = data.rooms;
             renderRelays();
             renderFilterChips();
         }
@@ -111,6 +128,11 @@ async function pollData() {
         if (data.branches) {
             renderBranches(data.branches);
         }
+
+        if (data.system_mode) {
+            systemMode = data.system_mode.toUpperCase();
+            updateSystemModeUI();
+        }
     } catch (err) {
         setOnlineStatus(false);
     }
@@ -142,6 +164,7 @@ async function pollRelays() {
         
         if (data.success && data.relays) {
             relayStates = data.relays;
+            if (data.lights) applyLightStates(data.lights);
             pfcMode = data.pfc_mode || 'AUTO';
             loadMode = data.load_mode || 'AUTO';
 
@@ -153,20 +176,60 @@ async function pollRelays() {
     }
 }
 
-// Update Mode indicators
+// Update Mode indicators (Overview card and the AI & Auto tab copy)
 function updateModeUI() {
-    const pfcBtn = document.getElementById('mode-btn-pfc');
-    const pfcStatus = document.getElementById('mode-status-pfc');
-    if (pfcBtn && pfcStatus) {
-        pfcStatus.textContent = pfcMode;
-        pfcBtn.className = `mode-badge-btn ${pfcMode === 'AUTO' ? 'active-auto' : 'active-manual'}`;
-    }
+    ['', '-2'].forEach(suffix => {
+        const pfcBtn = document.getElementById(`mode-btn-pfc${suffix}`);
+        const pfcStatus = document.getElementById(`mode-status-pfc${suffix}`);
+        if (pfcBtn && pfcStatus) {
+            pfcStatus.textContent = pfcMode;
+            pfcBtn.className = `mode-badge-btn ${pfcMode === 'AUTO' ? 'active-auto' : 'active-manual'}`;
+        }
 
-    const loadBtn = document.getElementById('mode-btn-load');
-    const loadStatus = document.getElementById('mode-status-load');
-    if (loadBtn && loadStatus) {
-        loadStatus.textContent = loadMode;
-        loadBtn.className = `mode-badge-btn ${loadMode === 'AUTO' ? 'active-auto' : 'active-manual'}`;
+        const loadBtn = document.getElementById(`mode-btn-load${suffix}`);
+        const loadStatus = document.getElementById(`mode-status-load${suffix}`);
+        if (loadBtn && loadStatus) {
+            loadStatus.textContent = loadMode;
+            loadBtn.className = `mode-badge-btn ${loadMode === 'AUTO' ? 'active-auto' : 'active-manual'}`;
+        }
+    });
+}
+
+// System Operating Mode: MANUAL / AI_ASSISTED / SECURITY
+function updateSystemModeUI() {
+    ['MANUAL', 'AI_ASSISTED', 'SECURITY'].forEach(mode => {
+        const btn = document.getElementById(`sys-mode-btn-${mode}`);
+        if (btn) btn.classList.toggle('active', mode === systemMode);
+    });
+    const pill = document.getElementById('sys-mode-pill');
+    if (pill) {
+        pill.textContent = systemMode === 'AI_ASSISTED' ? 'AI-ASSIST' : systemMode;
+        pill.classList.toggle('security', systemMode === 'SECURITY');
+    }
+    const desc = document.getElementById('sys-mode-desc');
+    if (desc) desc.textContent = SYSTEM_MODE_DESC[systemMode] || '';
+}
+
+async function setSystemMode(mode) {
+    if (mode === systemMode) return;
+    if (mode === 'SECURITY' && !confirm('Switch to SECURITY mode?\n\nAll non-critical loads will be turned OFF. Refrigerator and CCTV stay ON.')) return;
+    try {
+        const res = await fetch('/api/mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: mode })
+        });
+        const data = await res.json();
+        if (data.success) {
+            systemMode = mode;
+            updateSystemModeUI();
+            showToast(`System mode: ${mode === 'AI_ASSISTED' ? 'AI-ASSIST' : mode}`);
+            pollRelays();
+        } else {
+            showToast(`Error: ${data.message || 'Mode change failed'}`);
+        }
+    } catch (err) {
+        showToast("Failed to switch mode");
     }
 }
 
@@ -233,45 +296,171 @@ function renderRelays() {
     list.innerHTML = '';
     filtered.forEach(device => {
         const relayId = device.id;
-        const state = (relayStates[relayId] === 'ON');
+        const state = isLoadOn(device);
 
         const card = document.createElement('div');
-        card.className = `relay-item-card ${state ? 'is-on' : ''}`;
+        card.className = `relay-item-card ${state ? 'is-on' : ''} ${device.three_way ? 'three-way' : ''}`;
         card.id = `relay-card-${relayId}`;
 
-        card.innerHTML = `
-            <div class="relay-info-box">
-                <div class="relay-id-indicator">#${relayId}</div>
-                <div class="relay-name-room">
-                    <h3>${device.name || `Load ${relayId}`}</h3>
-                    <div class="relay-meta">
-                        <span class="relay-room-pill">${device.room || 'General'}</span>
-                        <span>• ${device.pin_desc || ''}</span>
-                    </div>
-                </div>
-            </div>
+        const control = device.three_way ? `
+            <button class="light-toggle-btn" id="light-btn-${relayId}" onclick="toggleLight(${relayId})" aria-label="Toggle light">
+                <i class="ph-fill ph-lightbulb"></i>
+                <span class="light-state" id="light-state-${relayId}">${lightLabel(device)}</span>
+            </button>
+        ` : `
             <label class="switch-control">
                 <input type="checkbox" id="switch-relay-${relayId}" ${state ? 'checked' : ''} onchange="toggleRelay(${relayId}, this.checked)">
                 <span class="slider-knob"></span>
             </label>
         `;
+
+        card.innerHTML = `
+            <div class="relay-info-box">
+                <div class="relay-id-indicator">#${relayId}</div>
+                <div class="relay-name-room">
+                    <h3>${escapeHtml(device.name || `Load ${relayId}`)}
+                        <button class="relay-edit-btn" onclick="openEditSheet(${relayId})" aria-label="Edit name and room"><i class="ph ph-pencil-simple"></i></button>
+                    </h3>
+                    <div class="relay-meta">
+                        <span class="relay-room-pill">${escapeHtml(device.room || 'General')}</span>
+                        <span>• ${escapeHtml(device.pin || '')}</span>
+                    </div>
+                    ${device.three_way ? `<div class="three-way-hint"><i class="ph ph-arrows-split"></i> 3-way: wall switch also works</div>` : ''}
+                </div>
+            </div>
+            ${control}
+        `;
         list.appendChild(card);
+    });
+}
+
+// 3-way lights report the real lamp state (PZEM current), not the relay position
+function isLoadOn(device) {
+    if (device.three_way) {
+        const light = lightStates[device.id];
+        return light ? light.state === 'ON' : relayStates[device.id] === 'ON';
+    }
+    return relayStates[device.id] === 'ON';
+}
+
+function lightLabel(device) {
+    if (pendingToggles[device.id]) return 'Switching…';
+    const light = lightStates[device.id];
+    const on = isLoadOn(device);
+    return `${on ? 'ON' : 'OFF'}${light && !light.sensed ? ' (est.)' : ''}`;
+}
+
+function applyLightStates(lights) {
+    Object.entries(lights).forEach(([id, light]) => {
+        const pending = pendingToggles[id];
+        // Clear "Switching…" once the lamp state changes, or after 6 s without a change
+        if (pending && (light.state !== pending.from || Date.now() - pending.at > 6000 || !light.sensed)) {
+            delete pendingToggles[id];
+        }
+        lightStates[id] = light;
     });
 }
 
 function updateRelaySwitches() {
     devicesList.forEach(device => {
         const id = device.id;
-        const state = (relayStates[id] === 'ON');
+        const state = isLoadOn(device);
         const input = document.getElementById(`switch-relay-${id}`);
         const card = document.getElementById(`relay-card-${id}`);
         if (input && input.checked !== state) {
             input.checked = state;
         }
+        const lightEl = document.getElementById(`light-state-${id}`);
+        if (lightEl) {
+            lightEl.textContent = lightLabel(device);
+            document.getElementById(`light-btn-${id}`)?.classList.toggle('pending', !!pendingToggles[id]);
+        }
         if (card) {
             card.classList.toggle('is-on', state);
         }
     });
+}
+
+// 3-Way Light: flip the relay contact (the wall switch can flip it too)
+async function toggleLight(id) {
+    if (pendingToggles[id]) return;
+    const light = lightStates[id];
+    pendingToggles[id] = { from: light ? light.state : relayStates[id], at: Date.now() };
+    updateRelaySwitches();
+    try {
+        const res = await fetch('/api/relay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ relay_id: id, action: 'toggle' })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            delete pendingToggles[id];
+            showToast(`Error: ${data.message || 'Toggle failed'}`);
+        } else {
+            showToast(`Light #${id} toggled`);
+        }
+    } catch (err) {
+        delete pendingToggles[id];
+        showToast("Connection failed");
+    }
+    pollRelays();
+}
+
+// Edit device name / room
+function openEditSheet(id) {
+    const device = devicesList.find(d => d.id === id);
+    if (!device) return;
+    document.getElementById('edit-sheet').dataset.deviceId = id;
+    document.getElementById('edit-sheet-id').textContent = `#${id}`;
+    document.getElementById('edit-name-input').value = device.name || '';
+
+    const select = document.getElementById('edit-room-select');
+    const rooms = roomOptions.length ? [...roomOptions] : [...new Set(devicesList.map(d => d.room).filter(Boolean))];
+    if (device.room && !rooms.includes(device.room)) rooms.push(device.room);
+    select.innerHTML = '';
+    rooms.forEach(room => {
+        const opt = document.createElement('option');
+        opt.value = room;
+        opt.textContent = room;
+        opt.selected = room === device.room;
+        select.appendChild(opt);
+    });
+
+    document.getElementById('edit-sheet-backdrop').classList.add('open');
+    document.getElementById('edit-sheet').classList.add('open');
+}
+
+function closeEditSheet() {
+    document.getElementById('edit-sheet-backdrop').classList.remove('open');
+    document.getElementById('edit-sheet').classList.remove('open');
+}
+
+async function saveEditSheet() {
+    const id = parseInt(document.getElementById('edit-sheet').dataset.deviceId, 10);
+    const name = document.getElementById('edit-name-input').value.trim();
+    const room = document.getElementById('edit-room-select').value;
+    if (!name) {
+        showToast("Name cannot be empty");
+        return;
+    }
+    try {
+        const res = await fetch('/api/devices/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, name: name, room: room })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeEditSheet();
+            showToast("Device updated");
+            await loadDevices();
+        } else {
+            showToast(`Error: ${data.message || 'Update failed'}`);
+        }
+    } catch (err) {
+        showToast("Connection failed");
+    }
 }
 
 // Send Relay Toggle Command
@@ -346,7 +535,7 @@ function renderBranches(branches) {
                 <div class="branch-top">
                     <div class="branch-title">
                         <i class="ph-fill ph-lightning" style="color: ${isOnline ? 'var(--primary)' : 'var(--text-muted)'}"></i>
-                        <span>${b.name}</span>
+                        <span>${escapeHtml(b.name)}</span>
                     </div>
                     <span class="branch-status-tag ${isOnline ? 'online' : 'standby'}">${b.status}</span>
                 </div>
@@ -406,7 +595,7 @@ function renderSuggestions(list) {
             <div class="suggestion-card">
                 <div class="sugg-header">
                     <i class="ph-fill ph-sparkle"></i>
-                    <h4 class="sugg-title">${s.message || s.title || 'Optimization Opportunity'}</h4>
+                    <h4 class="sugg-title">${escapeHtml(s.message || s.title || 'Optimization Opportunity')}</h4>
                 </div>
                 <p class="sugg-desc">
                     ${s.potential_savings ? `<span style="color:var(--primary); font-weight:600;">Savings: ${s.potential_savings}</span><br>` : ''}
@@ -456,7 +645,7 @@ function showToast(msg) {
         toast.className = 'toast-notice';
         document.body.appendChild(toast);
     }
-    toast.innerHTML = `<i class="ph-fill ph-check-circle" style="color:var(--primary); font-size:16px;"></i> <span>${msg}</span>`;
+    toast.innerHTML = `<i class="ph-fill ph-check-circle" style="color:var(--primary); font-size:16px;"></i> <span>${escapeHtml(msg)}</span>`;
     toast.classList.add('show');
     clearTimeout(window.toastTimer);
     window.toastTimer = setTimeout(() => {
@@ -466,7 +655,11 @@ function showToast(msg) {
 
 // Server URL re-configuration bridge
 function configureServerUrl() {
-    if (window.AndroidREMS && typeof window.AndroidREMS.openServerConfig === 'function') {
+    if (window.AndroidREMS && typeof window.AndroidREMS.postMessage === 'function') {
+        // APK v1.1+: origin-restricted WebMessageListener bridge
+        window.AndroidREMS.postMessage('openServerConfig');
+    } else if (window.AndroidREMS && typeof window.AndroidREMS.openServerConfig === 'function') {
+        // APK v1.0 legacy JavascriptInterface bridge
         window.AndroidREMS.openServerConfig();
     } else {
         const current = window.location.origin;

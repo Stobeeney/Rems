@@ -720,3 +720,234 @@ input:checked + .slider-knob:before {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
+
+/* System Operating Mode (Manual / AI-Assist / Security) */
+.sys-mode-pill {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--primary);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.sys-mode-pill.security {
+  color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.sys-mode-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sys-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sys-mode-btn i {
+  font-size: 20px;
+}
+
+.sys-mode-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.sys-mode-btn.security.active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.sys-mode-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+}
+
+/* Relay card: edit button and 3-way light toggle */
+.relay-item-card {
+  gap: 10px;
+}
+
+.relay-info-box {
+  min-width: 0;
+}
+
+.relay-name-room {
+  min-width: 0;
+}
+
+.relay-name-room h3 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.relay-edit-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.relay-edit-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.three-way-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.light-toggle-btn {
+  flex-shrink: 0;
+  min-width: 76px;
+  min-height: 48px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.light-toggle-btn i {
+  font-size: 20px;
+}
+
+.light-toggle-btn .light-state {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.relay-item-card.is-on .light-toggle-btn {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.light-toggle-btn.pending {
+  opacity: 0.6;
+}
+
+/* Edit Device bottom sheet */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.sheet-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.edit-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 301;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 10px 16px calc(16px + var(--safe-bottom));
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.edit-sheet.open {
+  transform: translateY(0);
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-color);
+  margin: 0 auto 12px;
+}
+
+.edit-sheet h3 {
+  font-size: 15px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-sheet label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin: 10px 0 6px;
+}
+
+.edit-sheet input,
+.edit-sheet select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sheet-actions .btn-sugg {
+  min-height: 44px;
+}

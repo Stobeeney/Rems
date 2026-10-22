@@ -11,6 +11,7 @@ import serial
 import re
 import threading
 import time
+import subprocess
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -249,6 +250,99 @@ pzem_branches = {
     for ch in range(11)
 }
 
+# Rooms a device can be assigned to (same list as DEDICATED_ROOMS in static/app.js)
+DEDICATED_ROOMS = [
+    "Living Room", "Master Bedroom", "Bedroom 2", "Kitchen", "Dining Room", "Bathroom",
+    "Garage", "Outdoor / Garden", "Hallway", "Laundry Area", "Main Panel"
+]
+DEVICE_NAME_MAX_LEN = 40
+
+# Relay -> dedicated PZEM branch channel (None = no dedicated meter, only the C0 main panel sees it)
+RELAY_CHANNEL_MAP = {
+    1: None, 2: None, 3: None,
+    4: "C1", 5: "C2", 6: "C3", 7: "C4", 8: "C5", 9: "C6", 10: "C7", 11: "C8", 12: "C9", 13: "C10",
+    14: None, 15: None, 16: None, 17: None, 18: None, 19: None, 20: None
+}
+
+# =============================================================================
+# Electrical 3-Way Lighting (relay SPDT + wall SPDT switch, joined by travelers)
+# =============================================================================
+# Flipping either the relay or the wall switch toggles the lamp, so the relay
+# position is NOT the light state. Real state comes from the branch PZEM current;
+# lights without a dedicated PZEM fall back to the relay position (estimate).
+THREE_WAY_LIGHTS = {4, 8, 15, 16, 17}
+LIGHT_ON_CURRENT_A = 0.02   # Branch current above this means the lamp is lit
+PZEM_STALE_SECONDS = 30     # Older readings are not trusted for light sensing
+LIGHT_SETTLE_SECONDS = 4    # After a toggle, trust the expected state until PZEM catches up
+light_pending = {}          # r_id -> (expected_on, toggled_at)
+
+def _branch_reading(ch_key):
+    """Returns the branch current if the reading is ONLINE and fresh, else None."""
+    branch = pzem_branches.get(ch_key) if ch_key else None
+    if not branch or branch.get("status") != "ONLINE" or not branch.get("last_updated"):
+        return None
+    try:
+        age = (datetime.now() - datetime.strptime(branch["last_updated"], "%Y-%m-%d %H:%M:%S")).total_seconds()
+    except ValueError:
+        return None
+    if age > PZEM_STALE_SECONDS:
+        return None
+    return float(branch.get("current", 0.0))
+
+def light_state(r_id):
+    """(is_on, sensed, current) for a 3-way light."""
+    current = _branch_reading(RELAY_CHANNEL_MAP.get(r_id))
+    if current is None:
+        return relay_status.get(r_id, False), False, None
+    # The PZEM mux cycle lags a toggle by a few seconds; without this hold,
+    # the 0.3 s automation loop would see the old state and toggle again (flicker)
+    pending = light_pending.get(r_id)
+    if pending:
+        expected_on, toggled_at = pending
+        if time.time() - toggled_at < LIGHT_SETTLE_SECONDS:
+            return expected_on, True, current
+        light_pending.pop(r_id, None)
+    return current > LIGHT_ON_CURRENT_A, True, current
+
+def load_is_on(r_id):
+    """Whether the load is actually powered (sensed light state for 3-way lights)."""
+    if r_id in THREE_WAY_LIGHTS:
+        return light_state(r_id)[0]
+    return relay_status.get(r_id, False)
+
+def toggle_relay_position(r_id):
+    """Flips the relay contact (for 3-way lights this toggles the lamp)."""
+    if r_id in THREE_WAY_LIGHTS:
+        light_pending[r_id] = (not light_state(r_id)[0], time.time())
+    new_pos = not relay_status.get(r_id, False)
+    if relays.get(r_id):
+        if new_pos:
+            relays[r_id].on()
+        else:
+            relays[r_id].off()
+    relay_status[r_id] = new_pos
+    return new_pos
+
+def set_load(r_id, want_on):
+    """Drives a load to the wanted state. 3-way lights are toggled only when needed."""
+    if r_id in THREE_WAY_LIGHTS:
+        if load_is_on(r_id) != want_on:
+            toggle_relay_position(r_id)
+        return
+    if relays.get(r_id):
+        if want_on:
+            relays[r_id].on()
+        else:
+            relays[r_id].off()
+    relay_status[r_id] = want_on
+
+def lights_snapshot():
+    snap = {}
+    for r_id in sorted(THREE_WAY_LIGHTS):
+        is_on, sensed, current = light_state(r_id)
+        snap[str(r_id)] = {"state": "ON" if is_on else "OFF", "sensed": sensed, "current": current}
+    return snap
+
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -314,9 +408,39 @@ def mobile():
     """
     return render_template('mobile.html')
 
+def is_local_kiosk_request():
+    """True only for the Pi's own browser. Tunnel traffic also arrives from 127.0.0.1
+    (cloudflared), so requests carrying proxy headers are rejected."""
+    if request.remote_addr not in ('127.0.0.1', '::1'):
+        return False
+    proxy_headers = ('CF-Connecting-IP', 'X-Forwarded-For', 'X-Real-IP', 'Forwarded')
+    return not any(request.headers.get(h) for h in proxy_headers)
+
+@app.route('/api/kiosk/exit', methods=['POST'])
+def exit_kiosk_browser():
+    """Closes the full-screen kiosk Chromium on the Pi so the desktop is reachable."""
+    if not is_local_kiosk_request():
+        return jsonify({"success": False, "message": "Exit kiosk is only allowed from the Pi's own screen"}), 403
+    # Only the kiosk / full-screen Chromium instance, not any other browser window
+    result = subprocess.run(['pkill', '-f', r'chromium.*--(kiosk|start-fullscreen)'], capture_output=True)
+    if result.returncode == 0:
+        print("🖥️ Kiosk browser closed from the touchscreen.")
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "No kiosk Chromium process found"}), 404
+
 @app.route('/api/tunnel', methods=['GET'])
 def get_tunnel_status():
     """Returns the live Cloudflare Tunnel URL if active"""
+    # Permanent named tunnel (set by deploy/setup-cloudflare-tunnel.sh)
+    public_url = os.getenv("REMS_PUBLIC_URL", "").strip().rstrip('/')
+    if public_url.startswith('https://'):
+        return jsonify({
+            "active": True,
+            "url": public_url,
+            "mobile_url": f"{public_url}/mobile"
+        })
+
+    # Fallback: temporary quick tunnel URL written by start_tunnel.sh
     tunnel_file = os.path.join(os.path.dirname(__file__), 'latest_tunnel_url.txt')
     if not os.path.exists(tunnel_file):
         tunnel_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'latest_tunnel_url.txt')
@@ -380,23 +504,25 @@ def control_relay():
                 "message": "ACU Interlock Active: Cannot energize Capacitor Banks while ACU (Relay 7) is running."
             }), 400
 
-    relay_obj = relays.get(relay_id)
-        
-    if relay_obj:
-        if action == 'on':
-            relay_obj.on()
-            relay_status[relay_id] = True
-            print(f"⚡ Physical Relay {relay_id} (Pin {relay_pins.get(relay_id)}) turned ON")
-        elif action == 'off':
-            relay_obj.off()
-            relay_status[relay_id] = False
-            print(f"⚡ Physical Relay {relay_id} (Pin {relay_pins.get(relay_id)}) turned OFF")
-        return jsonify({"success": True, "status": "ON" if action=='on' else "OFF"})
-    else:
-        # Fallback if hardware not present
-        if action == 'on': relay_status[relay_id] = True
-        elif action == 'off': relay_status[relay_id] = False
-        return jsonify({"success": True, "status": "ON" if action=='on' else "OFF", "note": "Virtual only"})
+    if relay_id not in relay_pins:
+        return jsonify({"success": False, "message": f"Unknown relay {relay_id}"}), 400
+
+    note = {} if relays.get(relay_id) else {"note": "Virtual only"}
+
+    # 3-way lights: TOGGLE flips the relay contact; ON/OFF toggle only if the lamp differs
+    if action == 'toggle':
+        if relay_id not in THREE_WAY_LIGHTS:
+            return jsonify({"success": False, "message": "Toggle is only for 3-way lights"}), 400
+        toggle_relay_position(relay_id)
+        print(f"💡 3-Way Light Relay {relay_id} (Pin {relay_pins.get(relay_id)}) toggled")
+        return jsonify({"success": True, "toggled": True, **note})
+
+    if action not in ('on', 'off'):
+        return jsonify({"success": False, "message": "Invalid action"}), 400
+
+    set_load(relay_id, action == 'on')
+    print(f"⚡ Relay {relay_id} (Pin {relay_pins.get(relay_id)}) set {action.upper()}")
+    return jsonify({"success": True, "status": action.upper(), **note})
 
 @app.route('/api/relay/status', methods=['GET'])
 def relay_status_get():
@@ -406,7 +532,8 @@ def relay_status_get():
         "mode": "AUTO" if pfc_auto_mode else "MANUAL", # Backward compatibility
         "pfc_mode": "AUTO" if pfc_auto_mode else "MANUAL",
         "load_mode": "AUTO" if load_auto_mode else "MANUAL",
-        "relays": formatted_status
+        "relays": formatted_status,
+        "lights": lights_snapshot()
     })
 
 def get_sensor_linked_relays():
@@ -435,9 +562,11 @@ def get_devices():
             "room": r[2], 
             "pin": r[3], 
             "power": r[4],
-            "sensor_linked": bool(r[5])
+            "sensor_linked": bool(r[5]),
+            "three_way": r[0] in THREE_WAY_LIGHTS,
+            "sensed": RELAY_CHANNEL_MAP.get(r[0]) is not None
         } for r in rows]
-        return jsonify({"success": True, "devices": devices})
+        return jsonify({"success": True, "devices": devices, "rooms": DEDICATED_ROOMS})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -451,6 +580,20 @@ def update_device():
         sensor_linked = data.get('sensor_linked')
         if not dev_id:
             return jsonify({"success": False, "message": "Missing device ID"}), 400
+        try:
+            dev_id = int(dev_id)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "Invalid device ID"}), 400
+        if dev_id not in relay_pins:
+            return jsonify({"success": False, "message": f"Unknown device {dev_id}"}), 400
+        if name is not None:
+            name = str(name).strip()
+            if not name or len(name) > DEVICE_NAME_MAX_LEN:
+                return jsonify({"success": False, "message": f"Name must be 1-{DEVICE_NAME_MAX_LEN} characters"}), 400
+        if room is not None:
+            room = str(room).strip()
+            if room not in DEDICATED_ROOMS:
+                return jsonify({"success": False, "message": "Invalid room"}), 400
         
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
@@ -520,9 +663,8 @@ def manage_system_mode():
                 load_auto_mode = False
                 # Cut off non-critical convenience outlets; Keep critical (10=Ref, 18=CCTV) ON
                 for r_id in range(4, 21):
-                    if r_id not in [10, 18] and relays.get(r_id):
-                        relays[r_id].off()
-                        relay_status[r_id] = False
+                    if r_id not in [10, 18]:
+                        set_load(r_id, False)
                 print("🔒 Switched to SECURITY MODE: Non-critical outlets cut off. Critical loads preserved.")
             return jsonify({"success": True, "mode": system_mode})
         return jsonify({"success": False, "message": "Invalid mode. Choose MANUAL, AI_ASSISTED, or SECURITY"}), 400
@@ -549,7 +691,7 @@ def get_active_devices():
     active = []
     for r in rows:
         dev_id = r[0]
-        if relay_status.get(dev_id, False):
+        if load_is_on(dev_id):
             active.append({
                 "id": dev_id,
                 "name": r[1],
@@ -565,10 +707,8 @@ def turn_off_all_active_devices():
     """Turns off all active non-critical loads (preserves Refrigerator #10, CCTV #18, and PFC Banks)"""
     turned_off = []
     for r_id in range(4, 21):
-        if r_id not in [10, 18] and relay_status.get(r_id, False):
-            if relays.get(r_id):
-                relays[r_id].off()
-            relay_status[r_id] = False
+        if r_id not in [10, 18] and load_is_on(r_id):
+            set_load(r_id, False)
             turned_off.append(r_id)
     return jsonify({"success": True, "turned_off": turned_off, "count": len(turned_off)}), 200
 
@@ -623,6 +763,7 @@ def send_data_to_frontend():
     resp["load_auto"] = load_auto_mode
     resp["sensor_linked_relays"] = get_sensor_linked_relays()
     resp["relays"] = {str(k): ("ON" if v else "OFF") for k, v in relay_status.items()}
+    resp["lights"] = lights_snapshot()
     return jsonify(resp), 200
 
 
@@ -683,9 +824,7 @@ def handle_suggestion(s_id, action):
             print("🤖 [AI Suggestion Approved]: Engaged Capacitor Bank K1.")
         elif target_relay >= 4 and target_relay not in [10, 18]:
             # De-energize target non-critical load
-            if relays.get(target_relay):
-                relays[target_relay].off()
-                relay_status[target_relay] = False
+            set_load(target_relay, False)
             print(f"🤖 [AI Suggestion Approved]: Disconnected Relay #{target_relay}.")
             
         c.execute("INSERT INTO system_overrides (timestamp, source, action, details) VALUES (?, 'AI_RECOMMENDATION', 'APPROVE', ?)", (now_str, f"Approved: {msg}"))
@@ -774,9 +913,9 @@ def ai_anomaly_engine():
                 for r_id in range(4, 21):
                     if r_id in [10, 18]: # Protect critical loads
                         continue
-                    if relay_status.get(r_id, False):
-                        ch_key = f"C{r_id - 3}" if (r_id - 3) <= 10 else "C0"
-                        ch_p = pzem_branches.get(ch_key, {}).get("power", 0.0)
+                    if load_is_on(r_id):
+                        ch_key = RELAY_CHANNEL_MAP.get(r_id)
+                        ch_p = pzem_branches.get(ch_key, {}).get("power", 0.0) if ch_key else 0.0
                         if ch_p <= 0:
                             c.execute("SELECT power FROM devices WHERE id=?", (r_id,))
                             row = c.fetchone()
@@ -902,8 +1041,9 @@ def safety_monitoring_engine():
 
             # 2. Actuator Fault Detection (Relay commanded OFF but current persists)
             for r_id in range(4, 21):
-                if not relay_status.get(r_id, False):
-                    ch_key = f"C{r_id - 3}" if (r_id - 3) <= 10 else "C0"
+                ch_key = RELAY_CHANNEL_MAP.get(r_id)
+                # Skip unmetered relays and 3-way lights (the wall switch can power them with the relay "OFF")
+                if ch_key and r_id not in THREE_WAY_LIGHTS and not relay_status.get(r_id, False):
                     ch_i = pzem_branches.get(ch_key, {}).get("current", 0.0)
                     ch_p = pzem_branches.get(ch_key, {}).get("power", 0.0)
                     if ch_i > 0.20 or ch_p > 25.0:
@@ -948,15 +1088,8 @@ def security_simulation_engine():
                 if 18 <= hour <= 23:
                     sim_state = not sim_state
                     target_light = 4 if sim_state else 8 # Alternate living room & bedroom
-                    if relays.get(target_light):
-                        if sim_state:
-                            relays[target_light].on()
-                            relay_status[target_light] = True
-                            print(f"🔒 [Security Simulation]: Toggled ON Relay #{target_light} to simulate occupancy.")
-                        else:
-                            relays[target_light].off()
-                            relay_status[target_light] = False
-                            print(f"🔒 [Security Simulation]: Toggled OFF Relay #{target_light}.")
+                    set_load(target_light, sim_state)
+                    print(f"🔒 [Security Simulation]: Relay #{target_light} {'ON' if sim_state else 'OFF'} to simulate occupancy.")
         except Exception as e:
             print(f"⚠️ Security simulation error: {e}")
 
@@ -1078,9 +1211,8 @@ def occupancy_engine():
                 if system_mode == 'AI_ASSISTED':
                     linked_relays = get_sensor_linked_relays()
                     for r_id in linked_relays:
-                        if not relay_status.get(r_id, False) and relays.get(r_id):
-                            relays[r_id].on()
-                            relay_status[r_id] = True
+                        if not load_is_on(r_id) and relays.get(r_id):
+                            set_load(r_id, True)
                             print(f"🤖 [AI-Assisted]: HLK mmWave detected presence ({active_zones_count} zones active). Turned ON Relay {r_id}.")
             else:
                 elapsed = int(now - occupancy_state.get("last_motion_time", now))
@@ -1092,15 +1224,14 @@ def occupancy_engine():
                 if system_mode == 'AI_ASSISTED' and elapsed >= 120:
                     linked_relays = get_sensor_linked_relays()
                     for r_id in linked_relays:
-                        if relay_status.get(r_id, False) and relays.get(r_id):
-                            relays[r_id].off()
-                            relay_status[r_id] = False
+                        if load_is_on(r_id) and relays.get(r_id):
+                            set_load(r_id, False)
                             print(f"🤖 [AI-Assisted]: Vacancy timeout (2 mins reached). Turned OFF Relay {r_id}.")
                         
                 # In Manual Mode: Generate notification suggestion once vacant
                 elif system_mode == 'MANUAL' and elapsed == 120:
                     linked_relays = get_sensor_linked_relays()
-                    any_linked_on = any(relay_status.get(r, False) for r in linked_relays)
+                    any_linked_on = any(load_is_on(r) for r in linked_relays)
                     if any_linked_on:
                         conn = sqlite3.connect(DB_FILE)
                         c = conn.cursor()
