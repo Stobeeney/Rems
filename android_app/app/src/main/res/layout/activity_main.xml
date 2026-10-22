@@ -37,9 +37,10 @@
         app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
+            android:id="@+id/tvErrorTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⚡ REMS System Offline"
+            android:text="⚡ REMCS System Offline"
             android:textColor="#f43f5e"
             android:textSize="20sp"
             android:textStyle="bold"

@@ -1,6 +1,16 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+// Release signing key. keystore.properties (storeFile, storePassword, keyAlias, keyPassword)
+// stays on the build machine and is gitignored. Back up the .jks: without the same key,
+// updates can't be installed over the existing app.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -11,13 +21,12 @@ android {
         applicationId = "com.rems.thesis"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Server the app opens on first launch. Empty = built-in Demo Mode (bundled UI + simulated data).
-        // Set to the permanent tunnel URL once it exists.
+        // Server the app opens on first launch. Empty = ask for the Pi's pairing code.
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"\"")
     }
 
@@ -25,8 +34,20 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        if (keystoreProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -42,26 +63,8 @@ android {
         jvmTarget = "1.8"
     }
 
-    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/demoAssets"))
 }
 
-// Bundle the real mobile web UI (backend/templates + backend/static) into the APK for Demo Mode,
-// rewriting Flask url_for() tags into relative paths and injecting the simulated API.
-val prepareDemoAssets by tasks.registering(Copy::class) {
-    val backend = rootProject.file("../backend")
-    from(File(backend, "templates/mobile.html")) {
-        filter { line ->
-            line.replace(Regex("""\{\{\s*url_for\('static',\s*filename='([^']+)'\)\s*}}"""), "$1")
-                .replace(Regex("""(<script src="mobile\.js[^"]*"></script>)"""), "<script src=\"demo-api.js\"></script>\n    $1")
-        }
-    }
-    from(File(backend, "static")) {
-        include("mobile.js", "mobile.css", "manifest.json")
-    }
-    from(rootProject.file("demo/demo-api.js"))
-    into(layout.buildDirectory.dir("generated/demoAssets/demo"))
-}
-tasks.named("preBuild") { dependsOn(prepareDemoAssets) }
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")

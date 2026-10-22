@@ -19,12 +19,12 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
@@ -52,9 +52,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String PAIR_COOKIE = "rems_pair";
     private static final Pattern TUNNEL_URL_PATTERN = Pattern.compile("^https://[a-z0-9-]+\\.trycloudflare\\.com$");
     private static final String BRIDGE_NAME = "AndroidREMS";
-    // Demo Mode: bundled mobile UI with simulated data, used when no server URL is configured
-    private static final String DEMO_ORIGIN = "https://" + WebViewAssetLoader.DEFAULT_DOMAIN;
-    private static final String DEMO_URL = DEMO_ORIGIN + "/assets/demo/mobile.html";
     private static final String URL_HINT = "Pairing code (e.g. ABCD-EFGH-JKMN) or http://192.168.1.9:5000";
 
     private WebView webView;
@@ -64,7 +61,8 @@ public class MainActivity extends AppCompatActivity {
     private Button btnChangeUrl;
     private SharedPreferences prefs;
     private boolean bridgeRegistered = false;
-    private WebViewAssetLoader assetLoader;
+    private TextView tvErrorTitle;
+    private TextView tvErrorMessage;
     private boolean triedFreshTunnelUrl = false;
 
     @Override
@@ -79,6 +77,8 @@ public class MainActivity extends AppCompatActivity {
         layoutError = findViewById(R.id.layoutError);
         btnRetry = findViewById(R.id.btnRetry);
         btnChangeUrl = findViewById(R.id.btnChangeUrl);
+        tvErrorTitle = findViewById(R.id.tvErrorTitle);
+        tvErrorMessage = findViewById(R.id.tvErrorMessage);
 
         setupWebView();
         setupEvents();
@@ -109,16 +109,7 @@ public class MainActivity extends AppCompatActivity {
             return true;
         });
 
-        assetLoader = new WebViewAssetLoader.Builder()
-                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-                .build();
-
         webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return assetLoader.shouldInterceptRequest(request.getUrl());
-            }
-
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 // Only the configured REMS server may load inside the app; anything else opens externally
@@ -217,8 +208,30 @@ public class MainActivity extends AppCompatActivity {
             loadPaired(true);
             return;
         }
+        showOffline();
+    }
+
+    private void showOffline() {
         swipeRefresh.setRefreshing(false);
+        tvErrorTitle.setText("⚡ REMCS System Offline");
+        tvErrorMessage.setText("Unable to reach the Raspberry Pi. Check that the Pi is on and connected "
+                + "to the internet, then tap Retry.");
+        btnRetry.setVisibility(View.VISIBLE);
+        btnChangeUrl.setText("Change Pairing Code / URL");
         layoutError.setVisibility(View.VISIBLE);
+    }
+
+    /** First launch: nothing configured yet, ask for the pairing code. */
+    private void showSetup() {
+        swipeRefresh.setRefreshing(false);
+        webView.loadUrl("about:blank");
+        tvErrorTitle.setText("⚡ Welcome to REMCS");
+        tvErrorMessage.setText("Connect this phone to your Raspberry Pi using the pairing code shown on the "
+                + "Pi screen (Settings → Remote Access).");
+        btnRetry.setVisibility(View.GONE);
+        btnChangeUrl.setText("Enter Pairing Code");
+        layoutError.setVisibility(View.VISIBLE);
+        showChangeUrlDialog();
     }
 
     private boolean isPaired() {
@@ -253,8 +266,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 String target = prefs.getString(KEY_TUNNEL_URL, "");
                 if (target.isEmpty()) {
-                    swipeRefresh.setRefreshing(false);
-                    layoutError.setVisibility(View.VISIBLE);
+                    showOffline();
                     Toast.makeText(this, "Can't find the Pi. Is it on and connected to the internet?",
                             Toast.LENGTH_LONG).show();
                     return;
@@ -337,11 +349,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void openServer(String serverUrl) {
         if (serverUrl.isEmpty()) {
-            // No server configured yet: run the bundled UI on simulated data
-            registerBridge(DEMO_ORIGIN);
-            webView.loadUrl(DEMO_URL);
+            showSetup();
             return;
         }
+        layoutError.setVisibility(View.GONE);
 
         registerBridge(originOf(Uri.parse(serverUrl)));
 
@@ -390,12 +401,6 @@ public class MainActivity extends AppCompatActivity {
             loadDashboard();
         });
 
-        builder.setNeutralButton("Demo Mode", (dialog, which) -> {
-            prefs.edit().putString(KEY_SERVER_URL, "").remove(KEY_PAIR_CODE).remove(KEY_TUNNEL_URL).apply();
-            Toast.makeText(MainActivity.this, "Demo Mode: simulated data", Toast.LENGTH_SHORT).show();
-            layoutError.setVisibility(View.GONE);
-            loadDashboard();
-        });
 
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
         builder.show();
@@ -474,7 +479,7 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isServerOrigin(Uri target) {
         String serverUrl = getServerUrl();
-        String serverOrigin = serverUrl.isEmpty() ? DEMO_ORIGIN : originOf(Uri.parse(serverUrl));
+        String serverOrigin = serverUrl.isEmpty() ? null : originOf(Uri.parse(serverUrl));
         return serverOrigin != null && serverOrigin.equals(originOf(target));
     }
 

@@ -32,3 +32,6 @@ fp-info-cache
 backend/pairing_code.txt
 backend/latest_tunnel_url.txt
 backend/aircon_state.json
+android_app/keystore.properties
+*.jks
+*.keystore
