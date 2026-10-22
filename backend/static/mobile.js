@@ -326,6 +326,7 @@ function renderRelays() {
                         <span>• ${escapeHtml(device.pin || '')}</span>
                     </div>
                     ${device.three_way ? `<div class="three-way-hint"><i class="ph ph-arrows-split"></i> 3-way: wall switch also works</div>` : ''}
+                    ${device.aircon ? `<div class="three-way-hint"><i class="ph ph-snowflake"></i> Aircon: relay + IR remote (OFF waits ~30 s for shutdown)</div>` : ''}
                 </div>
             </div>
             ${control}

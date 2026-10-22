@@ -24,10 +24,10 @@
         [17, "Outdoor Security Lights", "Outdoor / Garden", "Pin 38 (GPIO 20)"],
         [18, "CCTV / Security NVR", "Main Panel", "Pin 40 (GPIO 21)"],
         [19, "Standby Outlets", "Living Room", "Pin 16 (GPIO 23)"],
-        [20, "Auxiliary Branch", "Main Panel", "Pin 18 (GPIO 24)"]
+        [20, "Air Conditioner Bedroom 2 (ACU 2)", "Bedroom 2", "Pin 18 (GPIO 24)"]
     ].map(([id, name, room, pin]) => ({
         id, name, room, pin, power: 0, sensor_linked: id === 4,
-        three_way: [4, 8, 15, 16, 17].includes(id), sensed: id >= 4 && id <= 13
+        three_way: [4, 8, 15, 16, 17].includes(id), aircon: id === 7 || id === 20, sensed: id >= 4 && id <= 13
     }));
     const ROOMS = ["Living Room", "Master Bedroom", "Bedroom 2", "Kitchen", "Dining Room", "Bathroom",
         "Garage", "Outdoor / Garden", "Hallway", "Laundry Area", "Main Panel"];
@@ -43,7 +43,7 @@
         4: [60, 0.95], 5: [110, 0.90], 6: [180, 0.85], 7: [950, 0.78], 8: [40, 0.97],
         9: [90, 0.92], 10: [150, 0.80], 11: [220, 0.88], 12: [600, 0.99], 13: [450, 0.75],
         14: [800, 0.95], 15: [70, 0.90], 16: [50, 0.96], 17: [80, 0.93], 18: [25, 0.90],
-        19: [15, 0.60], 20: [30, 0.85]
+        19: [15, 0.60], 20: [850, 0.78]
     };
     const BANK_KVAR = 250; // reactive power each capacitor bank compensates
 
@@ -71,9 +71,9 @@
     const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
 
     function setRelay(id, on) {
-        if (on && id === 7) [1, 2, 3].forEach(c => { relays[c] = false; }); // ACU interlock
-        if (on && [1, 2, 3].includes(id) && relays[7]) {
-            return { success: false, message: "ACU Interlock Active: Cannot energize Capacitor Banks while ACU (Relay 7) is running." };
+        if (on && (id === 7 || id === 20)) [1, 2, 3].forEach(c => { relays[c] = false; }); // ACU interlock
+        if (on && [1, 2, 3].includes(id) && (relays[7] || relays[20])) {
+            return { success: false, message: "ACU Interlock Active: Cannot energize Capacitor Banks while an aircon is running." };
         }
         if (THREE_WAY.includes(id)) {
             if (isOn(id) !== on) relays[id] = !relays[id];

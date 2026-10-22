@@ -831,6 +831,11 @@ input:checked + .slider:before {
     border-radius: 4px;
 }
 
+.badge-ir {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+}
+
 .display-size-group {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

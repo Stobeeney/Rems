@@ -118,7 +118,7 @@ let DEVICE_MAPPING = [
     { id: 4, name: "Living Room Lights", room: "Living Room", pin: "Pin 7 (GPIO 4)", power: 0.00, three_way: true },
     { id: 5, name: "Living Room TV", room: "Living Room", pin: "Pin 29 (GPIO 5)", power: 0.00 },
     { id: 6, name: "Outlet Group 1", room: "Living Room", pin: "Pin 31 (GPIO 6)", power: 0.00 },
-    { id: 7, name: "Air Conditioner Main (ACU)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00 },
+    { id: 7, name: "Air Conditioner Main (ACU)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00, aircon: true },
     { id: 8, name: "Bedroom 1 Lights", room: "Master Bedroom", pin: "Pin 24 (GPIO 8)", power: 0.00, three_way: true },
     { id: 9, name: "Bedroom 1 Outlet Group 2", room: "Master Bedroom", pin: "Pin 21 (GPIO 9)", power: 0.00 },
     { id: 10, name: "Refrigerator (Critical)", room: "Kitchen", pin: "Pin 19 (GPIO 10)", power: 0.00 },
@@ -131,7 +131,7 @@ let DEVICE_MAPPING = [
     { id: 17, name: "Outdoor Security Lights", room: "Outdoor / Garden", pin: "Pin 38 (GPIO 20)", power: 0.00, three_way: true },
     { id: 18, name: "CCTV / Security NVR", room: "Main Panel", pin: "Pin 40 (GPIO 21)", power: 0.00 },
     { id: 19, name: "Standby Outlets", room: "Living Room", pin: "Pin 16 (GPIO 23)", power: 0.00 },
-    { id: 20, name: "Auxiliary Branch", room: "Main Panel", pin: "Pin 18 (GPIO 24)", power: 0.00 }
+    { id: 20, name: "Air Conditioner Bedroom 2 (ACU 2)", room: "Bedroom 2", pin: "Pin 18 (GPIO 24)", power: 0.00, aircon: true }
 ];
 
 let currentRelayStates = {};
@@ -223,6 +223,7 @@ function initLoadControlTable() {
                     </button>
                     <span style="font-size: 10px; color: #8b949e; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(dev.pin)}</span>
                     ${dev.three_way ? '<span class="badge-3way" title="Electrical 3-way: relay + wall switch">3-WAY</span>' : ''}
+                    ${dev.aircon ? '<span class="badge-3way badge-ir" title="Relay powers the aircon; IR transmitter sends the remote ON/OFF">IR AIRCON</span>' : ''}
                 </div>
             </td>
             <td>

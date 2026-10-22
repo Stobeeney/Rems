@@ -1,4 +1,27 @@
 #include <PZEM004Tv30.h>
+// Aircon IR control: IRremoteESP8266. With ESP32 board package 3.x, install it from GitHub
+// (https://github.com/crankyoldgit/IRremoteESP8266 -> Code -> Download ZIP, then
+// Sketch -> Include Library -> Add .ZIP Library). The 2.8.6 Library Manager release does not compile on 3.x.
+#include <IRremoteESP8266.h>
+#include <IRac.h>
+#include <IRutils.h>
+
+// =============================================================================
+// Aircon IR transmitters (one per room). Module pins: DAT -> GPIO, VCC -> 5V, GND -> GND
+// =============================================================================
+#define IR_PIN_UNIT1 4   // Room 1 (Master Bedroom) aircon, paired with Pi relay 7
+#define IR_PIN_UNIT2 13  // Room 2 (Bedroom 2) aircon, paired with Pi relay 20
+
+// !! SET THESE to your aircon brand's protocol. To find it, wire a VS1838B IR receiver
+// to any free GPIO, flash the library example "IRrecvDumpV2", point the original remote
+// at it, and press ON. The "Protocol :" line shows the name (e.g. COOLIX, DAIKIN,
+// CARRIER_AC, MIDEA, GREE, PANASONIC_AC, LG, SAMSUNG_AC, TCL112AC, KELON).
+const decode_type_t AC_PROTOCOL_UNIT1 = decode_type_t::COOLIX;
+const decode_type_t AC_PROTOCOL_UNIT2 = decode_type_t::COOLIX;
+const float AC_SET_TEMP_C = 24.0;   // temperature sent with the ON command
+
+IRac acUnit1(IR_PIN_UNIT1);
+IRac acUnit2(IR_PIN_UNIT2);
 
 // Multiplexer Address Select Pins
 #define PIN_S0 25
@@ -24,9 +47,71 @@ void selectMuxChannel(uint8_t ch) {
     delay(20); // Switching settling time
 }
 
+void setupAircon(IRac &ac, decode_type_t protocol) {
+    ac.next.protocol = protocol;
+    ac.next.model = 1;
+    ac.next.mode = stdAc::opmode_t::kCool;
+    ac.next.celsius = true;
+    ac.next.degrees = AC_SET_TEMP_C;
+    ac.next.fanspeed = stdAc::fanspeed_t::kAuto;
+    ac.next.swingv = stdAc::swingv_t::kAuto;
+    ac.next.swingh = stdAc::swingh_t::kOff;
+    ac.next.light = true;
+    ac.next.beep = true;
+    ac.next.power = false;
+}
+
+// Sends the aircon ON/OFF code and acknowledges to the Pi: {"ir":1,"power":"on","ok":true}
+void sendAircon(int unit, bool powerOn) {
+    IRac *ac = (unit == 1) ? &acUnit1 : (unit == 2) ? &acUnit2 : nullptr;
+    bool ok = false;
+    if (ac != nullptr && IRac::isProtocolSupported(ac->next.protocol)) {
+        ac->next.power = powerOn;
+        ok = ac->sendAc();
+    }
+    Serial.print("{\"ir\":");
+    Serial.print(unit);
+    Serial.print(",\"power\":\"");
+    Serial.print(powerOn ? "on" : "off");
+    Serial.print("\",\"ok\":");
+    Serial.print(ok ? "true" : "false");
+    Serial.println("}");
+}
+
+// Reads command lines from the Pi without blocking, e.g. {"cmd":"ir","unit":1,"power":"on"}
+String piLine;
+void pollPiCommands() {
+    while (Serial.available()) {
+        char c = (char)Serial.read();
+        if (c == '\n' || c == '\r') {
+            if (piLine.indexOf("\"cmd\":\"ir\"") >= 0) {
+                int u = piLine.indexOf("\"unit\":");
+                int unit = (u >= 0) ? piLine.substring(u + 7).toInt() : 0;
+                bool powerOn = piLine.indexOf("\"power\":\"on\"") >= 0;
+                sendAircon(unit, powerOn);
+            }
+            piLine = "";
+        } else if (piLine.length() < 120) {
+            piLine += c;
+        }
+    }
+}
+
+// delay() that keeps answering the Pi
+void delayPolling(unsigned long ms) {
+    unsigned long start = millis();
+    while (millis() - start < ms) {
+        pollPiCommands();
+        delay(5);
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
+
+    setupAircon(acUnit1, AC_PROTOCOL_UNIT1);
+    setupAircon(acUnit2, AC_PROTOCOL_UNIT2);
 
     pinMode(PIN_S0, OUTPUT);
     pinMode(PIN_S1, OUTPUT);
@@ -82,8 +167,8 @@ void loop() {
             Serial.println(",\"status\":\"STANDBY\",\"voltage\":0.0,\"current\":0.0,\"power\":0.0,\"pf\":0.0,\"freq\":0.0,\"energy\":0.0}");
         }
 
-        delay(35);
+        delayPolling(35);
     }
 
-    delay(400);
+    delayPolling(400);
 }
