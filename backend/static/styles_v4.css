@@ -817,35 +817,9 @@ input:checked + .slider:before {
 /* =========================================================================
    3-Way Light Control (relay + wall switch)
    ========================================================================= */
-.btn-light-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 34px;
-    padding: 6px 12px;
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-light);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text-main);
-    font-family: inherit;
-    font-size: calc(11px * var(--text-scale));
-    font-weight: 800;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.btn-light-toggle i {
-    font-size: calc(15px * var(--text-scale));
-}
-
-.btn-light-toggle.is-on {
-    background: rgba(234, 179, 8, 0.15);
-    border-color: var(--accent-yellow);
-    color: var(--accent-yellow);
-}
-
-.btn-light-toggle.pending {
-    opacity: 0.6;
+/* 3-way lights use the regular switch, in blue when ON */
+.switch-3way input:checked + .slider {
+    background-color: var(--accent-blue);
 }
 
 .badge-3way {

@@ -136,7 +136,6 @@ let DEVICE_MAPPING = [
 
 let currentRelayStates = {};
 let currentLightStates = {};   // 3-way lights: { id: {state, sensed, current} } from PZEM current
-let pendingLightToggles = {};  // 3-way lights waiting for the next reading after a toggle
 
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -157,7 +156,6 @@ function effectiveRelayState(relayId, relays, lights) {
 }
 
 function lightStateLabel(relayId) {
-    if (pendingLightToggles[relayId]) return 'SWITCHING…';
     const light = currentLightStates[String(relayId)];
     const st = effectiveRelayState(relayId, currentRelayStates, currentLightStates);
     return `${st}${light && !light.sensed ? ' (est.)' : ''}`;
@@ -189,11 +187,10 @@ function initLoadControlTable() {
         const roomOptionsHtml = DEDICATED_ROOMS.map(r => 
             `<option value="${escapeHtml(r)}" ${dev.room === r ? 'selected' : ''}>${escapeHtml(r)}</option>`
         ).join('');
-        const switchHtml = dev.three_way ? `
-                <button class="btn-light-toggle ${isChecked ? 'is-on' : ''}" id="light-btn-${dev.id}" onclick="toggleThreeWayLight(${dev.id})" title="3-way light: the wall switch also works">
-                    <i class="ph-fill ph-lightbulb"></i> TOGGLE
-                </button>` : `
-                <label class="switch">
+        // 3-way lights use the same switch (blue); ON/OFF follows the real lamp state,
+        // and the backend only flips the relay when the lamp is not already in that state
+        const switchHtml = `
+                <label class="switch ${dev.three_way ? 'switch-3way' : ''}" ${dev.three_way ? 'title="3-way light: the wall switch also works"' : ''}>
                     <input type="checkbox" id="switch-relay-${dev.id}" ${isChecked ? 'checked' : ''} onchange="toggleRelayDevice(${dev.id}, this.checked)">
                     <span class="slider"></span>
                 </label>`;
@@ -435,7 +432,6 @@ function updateRelayUIElement(relayId, stateStr) {
     const statText = document.getElementById(`stat-text-relay-${relayId}`);
     const pwr = document.getElementById(`pwr-relay-${relayId}`);
     const sw = document.getElementById(`switch-relay-${relayId}`);
-    const lightBtn = document.getElementById(`light-btn-${relayId}`);
     
     const isON = stateStr === 'ON';
     if (dot) dot.style.color = isON ? 'var(--primary)' : '#ef4444';
@@ -444,10 +440,6 @@ function updateRelayUIElement(relayId, stateStr) {
         statText.style.color = isON ? 'var(--primary)' : 'var(--text-muted)';
     }
     if (sw) sw.checked = isON;
-    if (lightBtn) {
-        lightBtn.classList.toggle('is-on', isON);
-        lightBtn.classList.toggle('pending', !!pendingLightToggles[relayId]);
-    }
     if (pwr) {
         const dev = DEVICE_MAPPING.find(d => d.id === relayId);
         if (dev) pwr.textContent = isON ? dev.power.toFixed(2) : '0.00';
@@ -455,40 +447,8 @@ function updateRelayUIElement(relayId, stateStr) {
 }
 
 function applyLightStates(lights) {
-    Object.entries(lights).forEach(([id, light]) => {
-        const pending = pendingLightToggles[id];
-        // Clear "SWITCHING…" once the lamp state changes, or after 6 s without a change
-        if (pending && (light.state !== pending.from || Date.now() - pending.at > 6000 || !light.sensed)) {
-            delete pendingLightToggles[id];
-        }
-    });
     currentLightStates = lights;
 }
-
-// 3-Way Light: flip the relay contact (the wall switch can flip it too)
-window.toggleThreeWayLight = async function(relayId) {
-    if (pendingLightToggles[relayId]) return;
-    pendingLightToggles[relayId] = {
-        from: effectiveRelayState(relayId, currentRelayStates, currentLightStates),
-        at: Date.now()
-    };
-    updateRelayUIElement(relayId, pendingLightToggles[relayId].from);
-    try {
-        const res = await fetch('/api/relay', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'toggle', relay_id: relayId, module: 'load' })
-        });
-        const data = await res.json();
-        if (!data.success) {
-            delete pendingLightToggles[relayId];
-            alert(data.message || 'Could not toggle the light.');
-        }
-    } catch (e) {
-        delete pendingLightToggles[relayId];
-        console.error("Error toggling 3-way light:", e);
-    }
-};
 
 // Background status poller (Syncs backend state with UI)
 setInterval(async () => {
