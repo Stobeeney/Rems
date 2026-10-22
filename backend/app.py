@@ -12,6 +12,12 @@ import re
 import threading
 import time
 import subprocess
+import hashlib
+import hmac
+import platform
+import secrets
+import shutil
+import urllib.request
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -530,8 +536,7 @@ def is_local_kiosk_request():
     (cloudflared), so requests carrying proxy headers are rejected."""
     if request.remote_addr not in ('127.0.0.1', '::1'):
         return False
-    proxy_headers = ('CF-Connecting-IP', 'X-Forwarded-For', 'X-Real-IP', 'Forwarded')
-    return not any(request.headers.get(h) for h in proxy_headers)
+    return not any(request.headers.get(h) for h in PROXY_HEADERS)
 
 def get_lan_ips():
     """IPv4 addresses of this Pi on the local network (for SSH / phone setup)."""
@@ -569,6 +574,189 @@ def exit_kiosk_browser():
         return jsonify({"success": True})
     return jsonify({"success": False, "message": "No kiosk Chromium process found"}), 404
 
+# =============================================================================
+# Remote access: free Cloudflare quick tunnel + phone pairing code
+# =============================================================================
+# The quick tunnel (https://<random>.trycloudflare.com) is free and needs no domain,
+# but its URL changes every time cloudflared restarts. So the backend:
+#   1. starts cloudflared itself (no extra script or service needed on the Pi)
+#   2. publishes the current URL to ntfy.sh under a topic derived from the pairing code
+#   3. the APK, given the pairing code once, looks up the latest URL there
+# Requests that come through the tunnel must carry the pairing code (cookie), so
+# knowing the URL alone is not enough to switch relays. LAN and kiosk access are unchanged.
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+PAIR_CODE_FILE = os.path.join(BACKEND_DIR, 'pairing_code.txt')   # gitignored, stays on the Pi
+PAIR_COOKIE = 'rems_pair'
+PAIR_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'                # no 0/O, 1/I/L
+NTFY_SERVER = os.getenv("REMS_NTFY_SERVER", "https://ntfy.sh").rstrip('/')
+TUNNEL_REPUBLISH_SECONDS = 30 * 60      # ntfy.sh keeps messages ~12 h; republish well before that
+QUICK_TUNNEL_ENABLED = os.getenv("REMS_QUICK_TUNNEL", "1") != "0" and not os.getenv("REMS_PUBLIC_URL", "").strip()
+PROXY_HEADERS = ('CF-Connecting-IP', 'X-Forwarded-For', 'X-Real-IP', 'Forwarded')
+
+tunnel_state = {"url": None, "status": "disabled" if not QUICK_TUNNEL_ENABLED else "starting",
+                "published_at": None, "error": None}
+pair_failures = {"count": 0, "locked_until": 0.0}
+
+def normalize_pair_code(raw):
+    return re.sub(r'[^A-Z0-9]', '', (raw or '').upper())
+
+def load_pairing_code():
+    """Reads the Pi's pairing code, creating a random one on first run."""
+    try:
+        with open(PAIR_CODE_FILE) as f:
+            code = normalize_pair_code(f.read())
+            if len(code) >= 10:
+                return code
+    except FileNotFoundError:
+        pass
+    code = ''.join(secrets.choice(PAIR_ALPHABET) for _ in range(12))
+    fd = os.open(PAIR_CODE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w') as f:
+        f.write(code + '\n')
+    return code
+
+PAIR_CODE = load_pairing_code()
+
+def pair_code_display(code):
+    return '-'.join(code[i:i + 4] for i in range(0, len(code), 4))
+
+def pair_topic(code):
+    """ntfy topic for the URL. Derived one-way, so the topic does not reveal the code.
+    Must match MainActivity.topicFor() in the APK."""
+    return 'remcs-' + hashlib.sha256(('remcs-topic:' + code).encode()).hexdigest()[:24]
+
+def is_tunnel_request():
+    return any(request.headers.get(h) for h in PROXY_HEADERS)
+
+def has_valid_pair_cookie():
+    return hmac.compare_digest(normalize_pair_code(request.cookies.get(PAIR_COOKIE, '')), PAIR_CODE)
+
+PAIR_PAGE = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>REMCS - Pair</title>
+<style>body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;display:flex;
+align-items:center;justify-content:center;min-height:100vh;margin:0}form{background:#161b22;
+padding:28px;border-radius:14px;width:min(340px,90vw)}h1{margin:0 0 6px;font-size:22px}
+p{color:#8b949e;font-size:14px}input{width:100%;box-sizing:border-box;padding:12px;font-size:18px;
+letter-spacing:2px;text-transform:uppercase;border-radius:8px;border:1px solid #30363d;
+background:#0d1117;color:#e6edf3}button{margin-top:14px;width:100%;padding:12px;font-size:16px;
+border:0;border-radius:8px;background:#22c55e;color:#04150a;font-weight:700}
+.err{color:#f87171}</style></head><body><form method="post" action="/pair">
+<h1>REMCS</h1><p>Enter the pairing code shown on the Pi screen (Settings &rarr; Remote Access).</p>
+{message}<input name="code" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autofocus>
+<button type="submit">Connect</button></form></body></html>"""
+
+def pair_page(message=''):
+    return PAIR_PAGE.replace('{message}', message)
+
+@app.before_request
+def require_pairing_for_remote():
+    """Tunnel (internet) requests need the pairing cookie. LAN and the kiosk do not."""
+    if not is_tunnel_request() or request.path == '/pair' or request.path.startswith('/static/'):
+        return None
+    if has_valid_pair_cookie():
+        return None
+    if request.path.startswith('/api/'):
+        return jsonify({"success": False, "message": "Pairing code required"}), 401
+    return pair_page(), 401
+
+@app.route('/pair', methods=['GET', 'POST'])
+def pair():
+    if request.method == 'GET':
+        return pair_page()
+    now = time.time()
+    if now < pair_failures["locked_until"]:
+        return pair_page('<p class="err">Too many wrong codes. Wait a minute and try again.</p>'), 429
+    if hmac.compare_digest(normalize_pair_code(request.form.get('code', '')), PAIR_CODE):
+        pair_failures["count"] = 0
+        resp = app.redirect('/mobile')
+        resp.set_cookie(PAIR_COOKIE, PAIR_CODE, max_age=365 * 24 * 3600, secure=True,
+                        httponly=True, samesite='Lax')
+        return resp
+    pair_failures["count"] += 1
+    if pair_failures["count"] >= 5:
+        pair_failures["count"] = 0
+        pair_failures["locked_until"] = now + 60
+    return pair_page('<p class="err">Wrong code.</p>'), 403
+
+@app.route('/api/remote-access', methods=['GET'])
+def remote_access_info():
+    """Pairing code + tunnel status. Only the Pi's own screen may see the code."""
+    if not is_local_kiosk_request():
+        return jsonify({"success": False, "message": "Only available on the Pi screen"}), 403
+    return jsonify({
+        "success": True,
+        "enabled": QUICK_TUNNEL_ENABLED,
+        "pair_code": pair_code_display(PAIR_CODE),
+        "url": tunnel_state["url"],
+        "status": tunnel_state["status"],
+        "published_at": tunnel_state["published_at"],
+        "error": tunnel_state["error"]
+    })
+
+def find_cloudflared():
+    """cloudflared on PATH or in ~/.local/bin; downloads the official binary if missing."""
+    for candidate in (shutil.which('cloudflared'),
+                      os.path.expanduser('~/.local/bin/cloudflared'),
+                      '/usr/local/bin/cloudflared'):
+        if candidate and os.access(candidate, os.X_OK):
+            return candidate
+    arch = {'aarch64': 'arm64', 'arm64': 'arm64', 'armv7l': 'arm', 'x86_64': 'amd64'}.get(platform.machine())
+    if not arch:
+        raise RuntimeError(f"no cloudflared build for {platform.machine()}")
+    target = os.path.expanduser('~/.local/bin/cloudflared')
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    url = f"https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-{arch}"
+    print(f"📦 Downloading cloudflared ({arch})...")
+    urllib.request.urlretrieve(url, target + '.part')
+    os.chmod(target + '.part', 0o755)
+    os.replace(target + '.part', target)
+    return target
+
+def publish_tunnel_url(url):
+    req = urllib.request.Request(f"{NTFY_SERVER}/{pair_topic(PAIR_CODE)}", data=url.encode(),
+                                 method='POST', headers={"Title": "REMCS tunnel URL"})
+    urllib.request.urlopen(req, timeout=15).read()
+    tunnel_state["published_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def _publisher(proc):
+    """Keeps the URL fresh on ntfy while this cloudflared process lives."""
+    while proc.poll() is None:
+        url = tunnel_state["url"]
+        if url:
+            try:
+                publish_tunnel_url(url)
+                tunnel_state["error"] = None
+            except Exception as e:
+                tunnel_state["error"] = f"publish failed: {e}"
+                time.sleep(30)
+                continue
+        time.sleep(TUNNEL_REPUBLISH_SECONDS if url else 2)
+
+def quick_tunnel_worker():
+    backoff = 5
+    while True:
+        try:
+            binary = find_cloudflared()
+            tunnel_state.update(status="starting", url=None)
+            proc = subprocess.Popen([binary, 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:5000'],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+            threading.Thread(target=_publisher, args=(proc,), daemon=True).start()
+            for line in proc.stderr:
+                m = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', line)
+                if m and not tunnel_state["url"]:
+                    tunnel_state.update(url=m.group(0), status="online", error=None)
+                    with open(os.path.join(BACKEND_DIR, 'latest_tunnel_url.txt'), 'w') as f:
+                        f.write(m.group(0) + '\n')
+                    print(f"🌐 Quick tunnel online: {m.group(0)}  (pair code {pair_code_display(PAIR_CODE)})")
+                    backoff = 5
+            proc.wait()
+            tunnel_state.update(status="restarting", url=None, error=f"cloudflared exited ({proc.returncode})")
+        except Exception as e:
+            tunnel_state.update(status="error", url=None, error=str(e))
+            print(f"⚠️ Quick tunnel error: {e}")
+        time.sleep(backoff)
+        backoff = min(backoff * 2, 300)
+
 @app.route('/api/tunnel', methods=['GET'])
 def get_tunnel_status():
     """Returns the live Cloudflare Tunnel URL if active"""
@@ -580,6 +768,10 @@ def get_tunnel_status():
             "url": public_url,
             "mobile_url": f"{public_url}/mobile"
         })
+
+    # Quick tunnel started by this backend
+    if tunnel_state["url"]:
+        return jsonify({"active": True, "url": tunnel_state["url"], "mobile_url": f"{tunnel_state['url']}/mobile"})
 
     # Fallback: temporary quick tunnel URL written by start_tunnel.sh
     tunnel_file = os.path.join(os.path.dirname(__file__), 'latest_tunnel_url.txt')
@@ -1485,6 +1677,10 @@ safety_thread.start()
 
 security_thread = threading.Thread(target=security_simulation_engine, daemon=True)
 security_thread.start()
+
+if QUICK_TUNNEL_ENABLED:
+    tunnel_thread = threading.Thread(target=quick_tunnel_worker, daemon=True)
+    tunnel_thread.start()
 
 if __name__ == '__main__':
     # I-run ang server sa port 5000 at i-expose sa network (0.0.0.0)

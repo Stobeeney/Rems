@@ -1068,3 +1068,38 @@ html.text-large .lc-layout {
 html.text-large .dark-table td:first-child {
     min-width: 190px;
 }
+
+/* Remote Access card (Settings) */
+.remote-access-box {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.ra-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: calc(13px * var(--text-scale));
+}
+.ra-row span { color: var(--text-muted); }
+#ra-pair-code {
+    font-family: monospace;
+    font-size: calc(20px * var(--text-scale));
+    letter-spacing: 2px;
+    color: #ffffff;
+}
+.ra-url {
+    font-family: monospace;
+    font-size: calc(11px * var(--text-scale));
+    color: #8b949e;
+    overflow-wrap: anywhere;
+    margin-bottom: 6px;
+}
+.ra-hint {
+    margin: 0;
+    font-size: calc(11px * var(--text-scale));
+    color: var(--text-muted);
+}

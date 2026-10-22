@@ -9,6 +9,7 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.CookieManager;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -27,18 +28,34 @@ import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "rems_prefs";
     private static final String KEY_SERVER_URL = "server_url";
+    // Pairing mode: the Pi runs a free Cloudflare quick tunnel whose URL changes on restart.
+    // The Pi posts the current URL to ntfy.sh under a topic derived from its pairing code.
+    private static final String KEY_PAIR_CODE = "pair_code";
+    private static final String KEY_TUNNEL_URL = "tunnel_url";      // last URL found for the pairing code
+    private static final String NTFY_SERVER = "https://ntfy.sh";
+    private static final String PAIR_COOKIE = "rems_pair";
+    private static final Pattern TUNNEL_URL_PATTERN = Pattern.compile("^https://[a-z0-9-]+\\.trycloudflare\\.com$");
     private static final String BRIDGE_NAME = "AndroidREMS";
     // Demo Mode: bundled mobile UI with simulated data, used when no server URL is configured
     private static final String DEMO_ORIGIN = "https://" + WebViewAssetLoader.DEFAULT_DOMAIN;
     private static final String DEMO_URL = DEMO_ORIGIN + "/assets/demo/mobile.html";
-    private static final String URL_HINT = "http://192.168.1.9:5000 or https://your-tunnel.example.com";
+    private static final String URL_HINT = "Pairing code (e.g. ABCD-EFGH-JKMN) or http://192.168.1.9:5000";
 
     private WebView webView;
     private SwipeRefreshLayout swipeRefresh;
@@ -48,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences prefs;
     private boolean bridgeRegistered = false;
     private WebViewAssetLoader assetLoader;
+    private boolean triedFreshTunnelUrl = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,8 +146,17 @@ public class MainActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request.isForMainFrame()) {
-                    swipeRefresh.setRefreshing(false);
-                    layoutError.setVisibility(View.VISIBLE);
+                    onMainFrameFailed();
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                super.onReceivedHttpError(view, request, response);
+                // A stale quick-tunnel URL answers with Cloudflare errors (404/502/530)
+                if (request.isForMainFrame() && isPaired() && response.getStatusCode() >= 404
+                        && response.getStatusCode() != 401) {
+                    onMainFrameFailed();
                 }
             }
         });
@@ -182,12 +209,133 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void onMainFrameFailed() {
+        // In pairing mode the tunnel URL may have changed since we last looked it up: look it up once more
+        if (isPaired() && !triedFreshTunnelUrl) {
+            triedFreshTunnelUrl = true;
+            prefs.edit().remove(KEY_TUNNEL_URL).apply();
+            loadPaired(true);
+            return;
+        }
+        swipeRefresh.setRefreshing(false);
+        layoutError.setVisibility(View.VISIBLE);
+    }
+
+    private boolean isPaired() {
+        return !prefs.getString(KEY_PAIR_CODE, "").isEmpty();
+    }
+
     private String getServerUrl() {
+        if (isPaired()) {
+            return prefs.getString(KEY_TUNNEL_URL, "");
+        }
         return prefs.getString(KEY_SERVER_URL, BuildConfig.DEFAULT_SERVER_URL);
     }
 
     private void loadDashboard() {
-        String serverUrl = getServerUrl();
+        triedFreshTunnelUrl = false;
+        if (isPaired()) {
+            loadPaired(true);
+            return;
+        }
+        openServer(getServerUrl());
+    }
+
+    /** Finds the Pi's current tunnel URL (from ntfy.sh) in the background, then opens it. */
+    private void loadPaired(boolean lookUp) {
+        String code = prefs.getString(KEY_PAIR_CODE, "");
+        swipeRefresh.setRefreshing(true);
+        new Thread(() -> {
+            String url = lookUp ? lookUpTunnelUrl(code) : null;
+            runOnUiThread(() -> {
+                if (url != null) {
+                    prefs.edit().putString(KEY_TUNNEL_URL, url).apply();
+                }
+                String target = prefs.getString(KEY_TUNNEL_URL, "");
+                if (target.isEmpty()) {
+                    swipeRefresh.setRefreshing(false);
+                    layoutError.setVisibility(View.VISIBLE);
+                    Toast.makeText(this, "Can't find the Pi. Is it on and connected to the internet?",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                CookieManager cookies = CookieManager.getInstance();
+                cookies.setAcceptCookie(true);
+                cookies.setCookie(target, PAIR_COOKIE + "=" + code
+                        + "; Max-Age=31536000; Path=/; Secure; HttpOnly; SameSite=Lax");
+                cookies.flush();
+                openServer(target);
+            });
+        }).start();
+    }
+
+    /** Latest tunnel URL the Pi published for this pairing code, or null. */
+    private static String lookUpTunnelUrl(String code) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(NTFY_SERVER + "/" + topicFor(code) + "/json?poll=1&since=12h");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            String latest = null;
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    JSONObject msg = new JSONObject(line);
+                    String text = msg.optString("message", "").trim();
+                    if ("message".equals(msg.optString("event")) && TUNNEL_URL_PATTERN.matcher(text).matches()) {
+                        latest = text;   // messages arrive oldest first
+                    }
+                }
+            }
+            return latest;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    /** Must match pair_topic() in backend/app.py. */
+    private static String topicFor(String code) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            byte[] hash = sha.digest(("remcs-topic:" + code).getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format(Locale.ROOT, "%02x", b));
+            }
+            return "remcs-" + hex.substring(0, 24);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** A pairing code has only letters/digits (dashes optional), never a dot or colon like a URL. */
+    private static String asPairCode(String raw) {
+        String trimmed = raw.trim();
+        if (trimmed.contains(".") || trimmed.contains(":") || trimmed.contains("/")) {
+            return null;
+        }
+        String code = trimmed.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        return (code.length() >= 10 && code.length() <= 16) ? code : null;
+    }
+
+    private static String displayPairCode(String code) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < code.length(); i += 4) {
+            if (out.length() > 0) {
+                out.append('-');
+            }
+            out.append(code, i, Math.min(i + 4, code.length()));
+        }
+        return out.toString();
+    }
+
+    private void openServer(String serverUrl) {
         if (serverUrl.isEmpty()) {
             // No server configured yet: run the bundled UI on simulated data
             registerBridge(DEMO_ORIGIN);
@@ -206,18 +354,29 @@ public class MainActivity extends AppCompatActivity {
 
     private void showChangeUrlDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Server URL Configuration");
-        builder.setMessage("Enter the Tunnel HTTPS URL or Local IP of your Raspberry Pi.\n\n"
-                + "Plain http:// is only allowed for local network addresses (e.g. http://192.168.1.9:5000).");
+        builder.setTitle("Connect to your Pi");
+        builder.setMessage("Anywhere (mobile data): enter the PAIRING CODE shown on the Pi screen "
+                + "(Settings → Remote Access).\n\n"
+                + "Same Wi-Fi only: you can also enter the Pi's local IP, e.g. http://192.168.1.9:5000.");
 
         final EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setHint(URL_HINT);
-        input.setText(getServerUrl());
+        input.setText(isPaired() ? displayPairCode(prefs.getString(KEY_PAIR_CODE, ""))
+                : prefs.getString(KEY_SERVER_URL, BuildConfig.DEFAULT_SERVER_URL));
         input.setSelection(input.getText().length());
         builder.setView(input);
 
         builder.setPositiveButton("Save & Connect", (dialog, which) -> {
+            String pairCode = asPairCode(input.getText().toString());
+            if (pairCode != null) {
+                prefs.edit().putString(KEY_PAIR_CODE, pairCode).remove(KEY_TUNNEL_URL)
+                        .putString(KEY_SERVER_URL, "").apply();
+                Toast.makeText(MainActivity.this, "Pairing code saved. Finding your Pi…", Toast.LENGTH_SHORT).show();
+                layoutError.setVisibility(View.GONE);
+                loadDashboard();
+                return;
+            }
             String newUrl = normalizeUrl(input.getText().toString());
             String problem = validateServerUrl(newUrl);
             if (problem != null) {
@@ -225,14 +384,14 @@ public class MainActivity extends AppCompatActivity {
                 showChangeUrlDialog();
                 return;
             }
-            prefs.edit().putString(KEY_SERVER_URL, newUrl).apply();
+            prefs.edit().putString(KEY_SERVER_URL, newUrl).remove(KEY_PAIR_CODE).remove(KEY_TUNNEL_URL).apply();
             Toast.makeText(MainActivity.this, "URL updated!", Toast.LENGTH_SHORT).show();
             layoutError.setVisibility(View.GONE);
             loadDashboard();
         });
 
         builder.setNeutralButton("Demo Mode", (dialog, which) -> {
-            prefs.edit().putString(KEY_SERVER_URL, "").apply();
+            prefs.edit().putString(KEY_SERVER_URL, "").remove(KEY_PAIR_CODE).remove(KEY_TUNNEL_URL).apply();
             Toast.makeText(MainActivity.this, "Demo Mode: simulated data", Toast.LENGTH_SHORT).show();
             layoutError.setVisibility(View.GONE);
             loadDashboard();

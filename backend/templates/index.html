@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>REMS - Residential Energy Management System</title>
-    <link rel="stylesheet" href="/static/styles_v4.css?v=29">
+    <link rel="stylesheet" href="/static/styles_v4.css?v=30">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Chart.js for graphs -->
@@ -993,6 +993,15 @@
                             <button class="btn btn-outline" data-scale="1.5" onclick="setTextScale(1.5)">Extra Large</button>
                         </div>
                     </div>
+                    <div class="form-group" id="remote-access-group">
+                        <label>Remote Access (Phone App)</label>
+                        <div class="remote-access-box">
+                            <div class="ra-row"><span>Pairing code</span><strong id="ra-pair-code">—</strong></div>
+                            <div class="ra-row"><span>Tunnel</span><strong id="ra-status">—</strong></div>
+                            <div class="ra-url" id="ra-url"></div>
+                            <p class="ra-hint">In the REMCS app: long-press the screen → enter this pairing code → Save &amp; Connect. Only this screen shows the code.</p>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label>Time Zone</label>
                         <select class="select-dark" style="width: 100%;">
@@ -1118,6 +1127,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=34"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=35"></script>
 </body>
 </html>

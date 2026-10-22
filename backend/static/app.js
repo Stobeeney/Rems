@@ -2020,3 +2020,23 @@ async function refreshPiIpAddress() {
 }
 refreshPiIpAddress();
 setInterval(refreshPiIpAddress, 30000);
+
+// Remote Access card (Settings): pairing code + quick tunnel status. Only the Pi's own screen gets the code.
+async function refreshRemoteAccess() {
+    const group = document.getElementById('remote-access-group');
+    if (!group) return;
+    try {
+        const res = await fetch('/api/remote-access');
+        if (res.status === 403) { group.style.display = 'none'; return; }
+        const data = await res.json();
+        if (!data.success) return;
+        document.getElementById('ra-pair-code').textContent = data.pair_code;
+        const labels = { online: 'ONLINE', starting: 'Starting…', restarting: 'Reconnecting…', error: 'Error', disabled: 'Off' };
+        const st = document.getElementById('ra-status');
+        st.textContent = labels[data.status] || data.status;
+        st.style.color = data.status === 'online' ? 'var(--primary)' : 'var(--accent-yellow)';
+        document.getElementById('ra-url').textContent = data.url || (data.error || '');
+    } catch (e) {}
+}
+refreshRemoteAccess();
+setInterval(refreshRemoteAccess, 15000);

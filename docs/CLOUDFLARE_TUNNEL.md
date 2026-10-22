@@ -1,4 +1,37 @@
-# REMS Remote Access: Cloudflare Named Tunnel
+# REMCS Remote Access
+
+## Option A (current setup, free): quick tunnel + pairing code
+
+No domain, no Cloudflare account, nothing to install by hand. After `git pull` and a restart, the backend (`app.py`) does it all:
+
+1. Starts a free Cloudflare **quick tunnel** (`https://<random-words>.trycloudflare.com`). It downloads `cloudflared` to `~/.local/bin` the first time.
+2. Creates a **pairing code** on first run, saved only on the Pi in `backend/pairing_code.txt` (gitignored).
+3. Posts the current tunnel URL to **ntfy.sh** under a topic derived from the pairing code (a one-way hash, so the topic does not reveal the code). It reposts every 30 minutes and whenever the URL changes, e.g. after a reboot.
+
+**Phone setup (one time):**
+1. On the Pi screen: **Settings → Remote Access (Phone App)**. It shows the pairing code (e.g. `ABCD-EFGH-JKMN`) and the tunnel status. Only the Pi's own screen can see the code.
+2. In the REMCS app: long-press the screen (or tap *Configure Server* on the error screen), type the pairing code, and tap **Save & Connect**.
+3. From then on the app finds the newest URL by itself, on Wi-Fi or mobile data.
+
+**Security:** anything coming through the tunnel needs the pairing code (cookie `rems_pair`):
+- `/api/*` answers 401 without it.
+- Pages show a "Enter pairing code" form.
+- Five wrong codes lock the form for 60 s.
+- LAN access (`http://192.168.x.x:5000`) and the kiosk work as before, with no code.
+
+To change the code (for example if it leaked), delete `backend/pairing_code.txt` and restart the backend. Then enter the new code in the app.
+
+Limits of the free option:
+- The URL changes on every restart. The app handles that, but browser bookmarks will break.
+- It depends on ntfy.sh and trycloudflare.com, which are free public services with no uptime guarantee.
+- To turn it off, add `REMS_QUICK_TUNNEL=0` to `backend/.env`.
+
+Do **not** also run `start_tunnel.sh`, because that starts a second tunnel.
+
+---
+
+## Option B (paid domain): Cloudflare Named Tunnel
+
 
 This gives the Raspberry Pi a **permanent HTTPS URL** (e.g. `https://rems.yourdomain.xyz`) so the dashboard and the Android app can see live sensor data from anywhere, over mobile data too.
 

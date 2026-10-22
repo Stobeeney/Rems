@@ -29,3 +29,5 @@ android_app/.idea/
 *.kicad_prl
 *-backups/
 fp-info-cache
+backend/pairing_code.txt
+backend/latest_tunnel_url.txt
