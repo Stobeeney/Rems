@@ -1978,8 +1978,13 @@ function markTextScaleButtons() {
     });
 }
 
-function applyTextScale(scale) {
+function setTextScaleVars(scale) {
     document.documentElement.style.setProperty('--text-scale', scale);
+    document.documentElement.classList.toggle('text-large', scale > 1.05);
+}
+
+function applyTextScale(scale) {
+    setTextScaleVars(scale);
     markTextScaleButtons();
     // Charts measure their container; let them re-fit
     window.dispatchEvent(new Event('resize'));
@@ -1996,7 +2001,7 @@ window.setTextScale = function(scale) {
     // The Pi's own touchscreen starts with large text; other browsers stay at normal
     const isKiosk = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
     const scale = (saved && saved >= 0.8 && saved <= 2) ? saved : (isKiosk ? KIOSK_DEFAULT_TEXT_SCALE : 1);
-    document.documentElement.style.setProperty('--text-scale', scale);
+    setTextScaleVars(scale);
 })();
 
 // Settings page is rendered from a template; highlight the active size once it is on screen

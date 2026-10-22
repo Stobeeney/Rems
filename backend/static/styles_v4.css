@@ -1014,3 +1014,78 @@ input:checked + .slider:before {
 [style*="font-size:48px"] {
     font-size: calc(48px * var(--text-scale)) !important;
 }
+
+/* -------------------------------------------------------------------------
+   Large text fixes (html.text-large is set by app.js when Text Size > Normal).
+   Keeps the original layout; only lets boxes grow or wrap so nothing overlaps.
+   ------------------------------------------------------------------------- */
+html.text-large .topbar {
+    gap: 10px;
+}
+
+html.text-large .topbar-left {
+    min-width: 0;
+}
+
+html.text-large .topbar h2 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+html.text-large .topbar-right,
+html.text-large .exit-kiosk-btn,
+html.text-large .user-profile {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+html.text-large .sidebar .logo p,
+html.text-large .main-nav li span {
+    white-space: normal;
+}
+
+html.text-large .badge-pill {
+    white-space: nowrap;
+}
+
+/* System mode buttons: stacked full-width so each label fits on one line */
+html.text-large .mode-grid {
+    grid-template-columns: 1fr !important;
+}
+
+html.text-large .mode-btn {
+    white-space: nowrap;
+    min-height: 34px;
+}
+
+/* Presence zones: one per row so the room names are not cut off */
+html.text-large .zone-grid {
+    grid-template-columns: 1fr !important;
+}
+
+/* Total power (kW + kWh) and power factor boxes wrap instead of overlapping */
+html.text-large .power-stat-row,
+html.text-large .pf-stat-row {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+html.text-large .power-stat-row > * {
+    flex: 1 1 auto;
+}
+
+/* PF gauge: the bigger value and status text hang below the 100px box,
+   so push the Target/Status lines down instead of growing the chart */
+html.text-large .gauge-wrapper {
+    margin-bottom: 22px;
+}
+
+/* Load Control: table gets the full width, override/schedule cards go below */
+html.text-large .lc-layout {
+    grid-template-columns: 1fr !important;
+}
+
+html.text-large .dark-table td:first-child {
+    min-width: 190px;
+}

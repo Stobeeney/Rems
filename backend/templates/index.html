@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>REMS - Residential Energy Management System</title>
-    <link rel="stylesheet" href="/static/styles_v4.css?v=25">
+    <link rel="stylesheet" href="/static/styles_v4.css?v=27">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Chart.js for graphs -->
@@ -198,7 +198,7 @@
                         <h3>SYSTEM OPERATING MODE</h3>
                         <span class="badge-pill badge-info" id="sys-mode-badge">MANUAL</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 4px;">
+                    <div class="mode-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 4px;">
                         <button class="btn btn-outline mode-btn active" id="btn-mode-manual" onclick="setSystemMode('MANUAL')" style="padding: 7px 4px; font-size: 11px; font-weight: 700;">MANUAL</button>
                         <button class="btn btn-outline mode-btn" id="btn-mode-ai" onclick="setSystemMode('AI_ASSISTED')" style="padding: 7px 4px; font-size: 11px; font-weight: 700;">AI-ASSIST</button>
                         <button class="btn btn-outline mode-btn" id="btn-mode-security" onclick="setSystemMode('SECURITY')" style="padding: 7px 4px; font-size: 11px; font-weight: 700;">SECURITY</button>
@@ -218,7 +218,7 @@
                     </div>
                     
                     <!-- 4-Zone Compact Matrix -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0;">
+                    <div class="zone-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0;">
                         <!-- Zone 1: Living Room -->
                         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
@@ -309,7 +309,7 @@
                     <div class="card-header">
                         <h3>Total Power Consumed</h3>
                     </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+                    <div class="power-stat-row" style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
                         <div style="display: flex; align-items: center; gap: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 8px 14px; border-radius: 8px;">
                             <i class="ph-fill ph-lightning" style="color: #60a5fa; font-size: 24px;"></i>
                             <div>
@@ -339,7 +339,7 @@
                     <div class="card-header">
                         <h3>Power Factor (pf)</h3>
                     </div>
-                    <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <div class="pf-stat-row" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <i class="ph ph-wave-sine" style="font-size: 24px; color: #c084fc;"></i>
                             <span style="font-size: 24px; font-weight: 800; color: #ffffff;" id="val-power-factor">0.00</span>
@@ -735,7 +735,7 @@
             </div>
 
             <!-- Main Layout: Devices Table (Left) + Overrides/Schedule (Right) -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+            <div class="lc-layout" style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
                 <!-- Left: Devices List Table -->
                 <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
                     <div style="padding: 16px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
@@ -1118,6 +1118,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=31"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=32"></script>
 </body>
 </html>
