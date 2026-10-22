@@ -7,10 +7,11 @@
 #include <IRutils.h>
 
 // =============================================================================
-// Aircon IR transmitters (one per room). Module pins: DAT -> GPIO, VCC -> 5V, GND -> GND
+// Aircon IR remote (one IR transmitter per room, no relay).
+// Module pins: DAT -> GPIO, VCC -> 5V, GND -> GND. Place it in the room, facing the aircon.
 // =============================================================================
-#define IR_PIN_UNIT1 4   // Room 1 (Master Bedroom) aircon, paired with Pi relay 7
-#define IR_PIN_UNIT2 13  // Room 2 (Bedroom 2) aircon, paired with Pi relay 20
+#define IR_PIN_UNIT1 4   // Room 1 (Master Bedroom) aircon
+#define IR_PIN_UNIT2 13  // Room 2 (Bedroom 2) aircon
 
 // Aircon brand protocol + model per room. Swap the two units if the rooms are reversed.
 //   AUX ASW-09A2/QCDI (inverter)  -> ELECTRA_AC (the library's AUX protocol), model 1
@@ -22,7 +23,7 @@ const decode_type_t AC_PROTOCOL_UNIT1 = decode_type_t::ELECTRA_AC;   // Room 1: 
 const int16_t       AC_MODEL_UNIT1    = 1;
 const decode_type_t AC_PROTOCOL_UNIT2 = decode_type_t::PANASONIC_AC; // Room 2: Panasonic
 const int16_t       AC_MODEL_UNIT2    = 3;                            // 3 = DKE, 5 = CKP
-const float AC_SET_TEMP_C = 24.0;   // temperature sent with the ON command
+const float AC_SET_TEMP_C = 24.0;   // starting temperature until the app sends one
 
 IRac acUnit1(IR_PIN_UNIT1);
 IRac acUnit2(IR_PIN_UNIT2);
@@ -65,12 +66,45 @@ void setupAircon(IRac &ac, decode_type_t protocol, int16_t model) {
     ac.next.power = false;
 }
 
-// Sends the aircon ON/OFF code and acknowledges to the Pi: {"ir":1,"power":"on","ok":true}
-void sendAircon(int unit, bool powerOn) {
+stdAc::opmode_t parseMode(const String &m) {
+    if (m == "dry")  return stdAc::opmode_t::kDry;
+    if (m == "fan")  return stdAc::opmode_t::kFan;
+    if (m == "auto") return stdAc::opmode_t::kAuto;
+    return stdAc::opmode_t::kCool;
+}
+
+stdAc::fanspeed_t parseFan(const String &f) {
+    if (f == "low")    return stdAc::fanspeed_t::kLow;
+    if (f == "medium") return stdAc::fanspeed_t::kMedium;
+    if (f == "high")   return stdAc::fanspeed_t::kHigh;
+    return stdAc::fanspeed_t::kAuto;
+}
+
+// Value of "key":"text" or "key":number in a flat JSON line ("" if missing)
+String jsonValue(const String &line, const char *key) {
+    String pattern = String("\"") + key + "\":";
+    int i = line.indexOf(pattern);
+    if (i < 0) return "";
+    i += pattern.length();
+    if (line[i] == '"') {
+        int end = line.indexOf('"', i + 1);
+        return end < 0 ? "" : line.substring(i + 1, end);
+    }
+    int end = i;
+    while (end < (int)line.length() && line[end] != ',' && line[end] != '}') end++;
+    return line.substring(i, end);
+}
+
+// Sends the full remote state (like pressing a button on the remote) and
+// acknowledges to the Pi: {"ir":1,"power":"on","ok":true}
+void sendAircon(int unit, bool powerOn, int temp, const String &mode, const String &fan) {
     IRac *ac = (unit == 1) ? &acUnit1 : (unit == 2) ? &acUnit2 : nullptr;
     bool ok = false;
     if (ac != nullptr && IRac::isProtocolSupported(ac->next.protocol)) {
         ac->next.power = powerOn;
+        if (temp >= 16 && temp <= 30) ac->next.degrees = temp;
+        if (mode.length()) ac->next.mode = parseMode(mode);
+        if (fan.length()) ac->next.fanspeed = parseFan(fan);
         ok = ac->sendAc();
     }
     Serial.print("{\"ir\":");
@@ -82,20 +116,24 @@ void sendAircon(int unit, bool powerOn) {
     Serial.println("}");
 }
 
-// Reads command lines from the Pi without blocking, e.g. {"cmd":"ir","unit":1,"power":"on"}
+// Reads command lines from the Pi without blocking, e.g.
+// {"cmd": "ir", "unit": 1, "power": "on", "temp": 24, "mode": "cool", "fan": "auto"}
 String piLine;
 void pollPiCommands() {
     while (Serial.available()) {
         char c = (char)Serial.read();
         if (c == '\n' || c == '\r') {
-            if (piLine.indexOf("\"cmd\":\"ir\"") >= 0) {
-                int u = piLine.indexOf("\"unit\":");
-                int unit = (u >= 0) ? piLine.substring(u + 7).toInt() : 0;
-                bool powerOn = piLine.indexOf("\"power\":\"on\"") >= 0;
-                sendAircon(unit, powerOn);
+            String line = piLine;
+            line.replace(" ", "");
+            if (jsonValue(line, "cmd") == "ir") {
+                sendAircon(jsonValue(line, "unit").toInt(),
+                           jsonValue(line, "power") == "on",
+                           jsonValue(line, "temp").toInt(),
+                           jsonValue(line, "mode"),
+                           jsonValue(line, "fan"));
             }
             piLine = "";
-        } else if (piLine.length() < 120) {
+        } else if (piLine.length() < 160) {
             piLine += c;
         }
     }

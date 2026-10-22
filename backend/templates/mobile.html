@@ -13,7 +13,7 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <!-- Mobile Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=4">
 </head>
 <body>
 
@@ -141,6 +141,16 @@
 
         <!-- TAB 3: RELAY LOADS (20 Relays) -->
         <section class="tab-pane" id="tab-relays">
+            <!-- Aircon IR Remote -->
+            <div class="m-card" style="margin-bottom: 12px;">
+                <div class="m-card-header">
+                    <span class="m-card-title"><i class="ph-fill ph-snowflake"></i> Aircon Remote</span>
+                </div>
+                <div class="aircon-remotes" id="aircon-remotes">
+                    <div class="ac-note">Loading…</div>
+                </div>
+            </div>
+
             <!-- Bulk Action Buttons -->
             <div class="bulk-btn-row">
                 <button class="btn-bulk btn-on" onclick="setAllRelays(true)">
@@ -268,6 +278,6 @@
     </div>
 
     <!-- Mobile Scripts -->
-    <script src="{{ url_for('static', filename='mobile.js') }}?v=4"></script>
+    <script src="{{ url_for('static', filename='mobile.js') }}?v=5"></script>
 </body>
 </html>

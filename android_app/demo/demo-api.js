@@ -24,10 +24,10 @@
         [17, "Outdoor Security Lights", "Outdoor / Garden", "Pin 38 (GPIO 20)"],
         [18, "CCTV / Security NVR", "Main Panel", "Pin 40 (GPIO 21)"],
         [19, "Standby Outlets", "Living Room", "Pin 16 (GPIO 23)"],
-        [20, "Air Conditioner Bedroom 2 (ACU 2)", "Bedroom 2", "Pin 18 (GPIO 24)"]
+        [20, "Auxiliary Branch", "Main Panel", "Pin 18 (GPIO 24)"]
     ].map(([id, name, room, pin]) => ({
         id, name, room, pin, power: 0, sensor_linked: id === 4,
-        three_way: [4, 8, 15, 16, 17].includes(id), aircon: id === 7 || id === 20, sensed: id >= 4 && id <= 13
+        three_way: [4, 8, 15, 16, 17].includes(id), sensed: id >= 4 && id <= 13
     }));
     const ROOMS = ["Living Room", "Master Bedroom", "Bedroom 2", "Kitchen", "Dining Room", "Bathroom",
         "Garage", "Outdoor / Garden", "Hallway", "Laundry Area", "Main Panel"];
@@ -43,13 +43,21 @@
         4: [60, 0.95], 5: [110, 0.90], 6: [180, 0.85], 7: [950, 0.78], 8: [40, 0.97],
         9: [90, 0.92], 10: [150, 0.80], 11: [220, 0.88], 12: [600, 0.99], 13: [450, 0.75],
         14: [800, 0.95], 15: [70, 0.90], 16: [50, 0.96], 17: [80, 0.93], 18: [25, 0.90],
-        19: [15, 0.60], 20: [850, 0.78]
+        19: [15, 0.60], 20: [30, 0.85]
     };
     const BANK_KVAR = 250; // reactive power each capacitor bank compensates
 
     const relays = {};
     for (let i = 1; i <= 20; i++) relays[i] = false;
     [4, 5, 7, 10, 11, 13, 18].forEach(i => { relays[i] = true; });
+
+    // Aircon IR remote (last command sent; no relay)
+    const aircons = {
+        1: { unit: 1, name: "Room 1 Aircon (AUX)", room: "Master Bedroom", power: false, temp: 24, mode: "cool", fan: "auto" },
+        2: { unit: 2, name: "Room 2 Aircon (Panasonic)", room: "Bedroom 2", power: false, temp: 25, mode: "cool", fan: "auto" }
+    };
+    const aconSnap = u => ({ ...aircons[u], state: aircons[u].power ? "ON" : "OFF", ir_ok: true, esp32: true });
+    const airconMap = () => ({ 1: aconSnap(1), 2: aconSnap(2) });
 
     let pfcAuto = false;
     let loadAuto = false;
@@ -71,8 +79,8 @@
     const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
 
     function setRelay(id, on) {
-        if (on && (id === 7 || id === 20)) [1, 2, 3].forEach(c => { relays[c] = false; }); // ACU interlock
-        if (on && [1, 2, 3].includes(id) && (relays[7] || relays[20])) {
+        if (on && id === 7) [1, 2, 3].forEach(c => { relays[c] = false; }); // ACU interlock
+        if (on && [1, 2, 3].includes(id) && (relays[7] || Object.values(aircons).some(a => a.power))) {
             return { success: false, message: "ACU Interlock Active: Cannot energize Capacitor Banks while an aircon is running." };
         }
         if (THREE_WAY.includes(id)) {
@@ -156,7 +164,7 @@
             frequency: main.frequency, energy: main.energy, last_updated: main.last_updated,
             branches, system_mode: systemMode,
             pfc_auto: pfcAuto, load_auto: loadAuto, sensor_linked_relays: [4],
-            relays: relayMap(), lights: lightsMap()
+            relays: relayMap(), lights: lightsMap(), aircons: airconMap()
         };
     }
 
@@ -183,10 +191,21 @@
 
     function handle(method, path, body) {
         if (method === 'GET' && path === '/api/data') return [200, telemetry()];
+        if (path === '/api/aircon') {
+            if (method === 'GET') return [200, { success: true, aircons: airconMap() }];
+            const ac = aircons[Number(body.unit)];
+            if (!ac) return [400, { success: false, message: "Unknown aircon unit" }];
+            if (body.power !== undefined) ac.power = body.power === 'on' || body.power === true;
+            if (body.temp !== undefined) ac.temp = Math.max(16, Math.min(30, Number(body.temp)));
+            if (body.mode) ac.mode = body.mode;
+            if (body.fan) ac.fan = body.fan;
+            if (ac.power) [1, 2, 3].forEach(c => { relays[c] = false; }); // ACU interlock
+            return [200, { success: true, aircon: aconSnap(ac.unit) }];
+        }
         if (method === 'GET' && path === '/api/devices') return [200, { success: true, devices: DEVICES, rooms: ROOMS }];
         if (method === 'GET' && path === '/api/relay/status') {
             const mode = pfcAuto ? "AUTO" : "MANUAL";
-            return [200, { success: true, mode, pfc_mode: mode, load_mode: loadAuto ? "AUTO" : "MANUAL", relays: relayMap(), lights: lightsMap() }];
+            return [200, { success: true, mode, pfc_mode: mode, load_mode: loadAuto ? "AUTO" : "MANUAL", relays: relayMap(), lights: lightsMap(), aircons: airconMap() }];
         }
         if (method === 'GET' && path === '/api/pzem/branches') return [200, telemetry().branches];
         if (method === 'GET' && path === '/api/mode') {

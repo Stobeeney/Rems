@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>REMS - Residential Energy Management System</title>
-    <link rel="stylesheet" href="/static/styles_v4.css?v=30">
+    <link rel="stylesheet" href="/static/styles_v4.css?v=31">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Chart.js for graphs -->
@@ -785,6 +785,15 @@
 
                 <!-- Right: Overrides & Schedule Widgets -->
                 <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Aircon IR Remote Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>AIRCON REMOTE (IR)</h3>
+                        </div>
+                        <div class="aircon-remotes" id="aircon-remotes">
+                            <div class="ac-note">Loading…</div>
+                        </div>
+                    </div>
                     <!-- Manual Override Card -->
                     <div class="card">
                         <div class="card-header">
@@ -1127,6 +1136,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=35"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=36"></script>
 </body>
 </html>

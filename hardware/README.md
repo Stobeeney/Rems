@@ -44,7 +44,7 @@ If you change a pin in code, regenerate it: `python3 hardware/schematic/generate
 | 11 | GPIO17 | **Relay 1**: PFC Capacitor Bank K1 | | 12 | GPIO18 | **Relay 15**: Garage Door & Lights |
 | 13 | GPIO27 | **Relay 2**: PFC Capacitor Bank K2 | | 14 | GND | |
 | 15 | GPIO22 | **Relay 3**: PFC Capacitor Bank K3 | | 16 | GPIO23 | **Relay 19**: Standby Outlets |
-| 17 | 3V3 | | | 18 | GPIO24 | **Relay 20**: Aircon Bedroom 2 (ACU 2) |
+| 17 | 3V3 | | | 18 | GPIO24 | **Relay 20**: Auxiliary Branch |
 | 19 | GPIO10 | **Relay 10**: Refrigerator (critical) | | 20 | GND | |
 | 21 | GPIO9 | **Relay 9**: Bedroom 1 Outlet Group 2 | | 22 | GPIO25 | **HLK zone 3**: Bedroom 2 |
 | 23 | GPIO11 | **Relay 11**: Kitchen Outlets | | 24 | GPIO8 | **Relay 8**: Bedroom 1 Lights |
@@ -71,7 +71,7 @@ USB-A port: ESP32 (appears as `/dev/ttyUSB0` or `/dev/ttyACM0`; `app.py` also tr
 | 4 | GPIO4 | 7 | Living Room Lights | Living Room | default motion-linked load |
 | 5 | GPIO5 | 29 | Living Room TV | Living Room | |
 | 6 | GPIO6 | 31 | Outlet Group 1 | Living Room | |
-| 7 | GPIO7 | 26 | Air Conditioner Main (ACU) | Master Bedroom | **Room 1 aircon** + IR unit 1 (§2.2); turning ON forces K1–K3 OFF |
+| 7 | GPIO7 | 26 | Air Conditioner Main (ACU) | Master Bedroom | turning ON forces K1–K3 OFF |
 | 8 | GPIO8 | 24 | Bedroom 1 Lights | Master Bedroom | |
 | 9 | GPIO9 | 21 | Bedroom 1 Outlet Group 2 | Master Bedroom | |
 | 10 | GPIO10 | 19 | Refrigerator | Kitchen | **critical**: never auto-cut |
@@ -84,7 +84,7 @@ USB-A port: ESP32 (appears as `/dev/ttyUSB0` or `/dev/ttyACM0`; `app.py` also tr
 | 17 | GPIO20 | 38 | Outdoor Security Lights | Outdoor / Garden | |
 | 18 | GPIO21 | 40 | CCTV / Security NVR | Main Panel | **critical**: never auto-cut |
 | 19 | GPIO23 | 16 | Standby Outlets | Living Room | |
-| 20 | GPIO24 | 18 | Air Conditioner Bedroom 2 (ACU 2) | Bedroom 2 | **Room 2 aircon** + IR unit 2 (§2.2); was the spare Auxiliary Branch; turning ON forces K1–K3 OFF |
+| 20 | GPIO24 | 18 | Auxiliary Branch | Main Panel | |
 
 Room names are editable in the app; the table shows the seeded defaults.
 
@@ -119,14 +119,14 @@ Relays 15–17 have no dedicated PZEM, so the app falls back to the relay positi
 
 ⚠️ **This is the mains side.** It is outside the control-wiring schematic. Check that the relay contacts are rated for the lamp load (typically 10 A 250 VAC), and have a licensed electrician do or check the wiring.
 
-### 2.2 Aircon control: relay + IR transmitter (Room 1 and Room 2)
+### 2.2 Aircon IR remote (Room 1 and Room 2, no relay)
 
-Each room has **one relay** (power to the aircon) and **one IR transmitter** (sends the aircon remote's ON/OFF code). That makes **2 IR transmitters**, not 3. IR light does not pass through walls, so a transmitter at the panel board could not reach the rooms. Instead, the **data wire** runs from the panel to the IR module, and the module sits **inside the room, facing the aircon's receiver window** (about 1–3 m away, clear line of sight).
+The room aircons are **not** on relays. Each room has **one IR transmitter** that works like the aircon's own remote: power, temperature (16–30 °C), mode (Cool / Dry / Fan / Auto) and fan (Auto / Low / Med / High). That makes **2 IR transmitters**. IR light does not pass through walls, so a transmitter at the panel board could not reach the rooms. Instead, the **wire** runs from the panel to the IR module, and the module sits **inside the room, facing the aircon's receiver window** (about 1–3 m away, clear line of sight).
 
-| Room | Aircon relay (Pi) | IR transmitter DAT (ESP32) | IR unit no. |
-|---|---|---|---|
-| Room 1: Master Bedroom | Relay 7 (GPIO7) | **GPIO4** | 1 |
-| Room 2: Bedroom 2 | Relay 20 (GPIO24) | **GPIO13** | 2 |
+| Room | Aircon | IR protocol (firmware) | IR transmitter DAT (ESP32) | Unit |
+|---|---|---|---|---|
+| Room 1: Master Bedroom | AUX ASW-09A2/QCDI | `ELECTRA_AC` (AUX), model 1 | **GPIO4** | 1 |
+| Room 2: Bedroom 2 | Panasonic CS-PC9KKQ | `PANASONIC_AC`, model 3 (DKE) | **GPIO13** | 2 |
 
 ```
  PANEL BOARD                                   ROOM (near the aircon)
@@ -137,23 +137,15 @@ Each room has **one relay** (power to the aircon) and **one IR transmitter** (se
                                                └──────────────────┘
 ```
 
-- **Why the ESP32 and not the Pi:** every Pi GPIO is already used (§1). The Pi sends one JSON line over the existing USB serial link, `{"cmd":"ir","unit":1,"power":"on"}`, and the ESP32 answers `{"ir":1,"power":"on","ok":true}`.
+- **Why the ESP32 and not the Pi:** every Pi GPIO is already used (§1). The Pi sends one JSON line over the existing USB serial link, `{"cmd":"ir","unit":1,"power":"on","temp":24,"mode":"cool","fan":"auto"}`, and the ESP32 answers `{"ir":1,"power":"on","ok":true}`. Every button sends the full state, just like a real AC remote.
+- **App:** *Load Control → Aircon Remote (IR)* on the tablet, *Relays → Aircon Remote* on the phone. API: `GET/POST /api/aircon`.
+- **No feedback:** the aircon cannot report its state. The app shows the **last command sent**, and it does not know if someone uses the original remote. The state is saved in `backend/aircon_state.json`, so it survives a restart.
+- **Automation:** SECURITY mode and *Turn off all* also send IR OFF to both aircons. While an aircon is ON, capacitor banks K1–K3 stay OFF (interlock).
 - **Use a module with a transistor driver** (e.g. an "IR transmitter module" with an S8050/S9013 transistor, or 2–3 IR LEDs). A bare KY-005 (LED + resistor only) driven straight from a 3.3 V pin reaches only about 1 m.
-- **Long runs (more than ~5 m):** use one cable that carries DAT, VCC and GND together, such as a CAT5 pair with GND twisted with DAT. The signal is a slow 38 kHz carrier, so a few metres are fine.
-- **Set the aircon brand protocol** in `esp32_11_pzem_multiplexer.ino` (`AC_PROTOCOL_UNIT1/2`). If the brand is unknown, connect a VS1838B IR receiver to any free ESP32 pin, flash the library example **IRrecvDumpV2**, and press ON on the original remote. The `Protocol :` line in the Serial Monitor names it. That is the only time an IR **receiver** is needed.
+- **Long runs (more than ~5 m):** use one cable that carries DAT, VCC and GND together, such as a CAT5 pair with GND twisted with DAT.
+- **Confirm the protocol and model** with a VS1838B IR receiver and the library example **IRrecvDumpV2**: press ON on the original remote and read the `Protocol :` and `Model:` lines. For the Panasonic, if the remote is an **A75C2311** type, set `AC_MODEL_UNIT2 = 5` (CKP). That model has a single power *toggle* code.
 - **Library:** IRremoteESP8266 from **GitHub** (Download ZIP → *Sketch → Include Library → Add .ZIP Library*). The 2.8.6 release in the Library Manager does not compile on ESP32 board package 3.x.
-
-**What happens when you press the aircon switch in the app** (`set_aircon` in `app.py`):
-
-| Command | Sequence |
-|---|---|
-| ON | Capacitor banks K1–K3 OFF (interlock) → relay ON → wait 3 s (aircon board boots) → IR **ON** |
-| OFF | IR **OFF** → wait 30 s (the unit finishes its shutdown/fan run-on) → relay OFF |
-| OFF while the ESP32 is disconnected | relay OFF right away (there is no IR to stop the unit gracefully) |
-
-The app switch flips immediately, and `/api/relay/status` → `aircons` shows the phase (`starting` / `stopping`), whether the IR was sent (`ir_ok`), and whether the ESP32 is connected. A new command cancels a sequence that is still waiting.
-
-⚠️ The aircon relay switches the aircon's supply. A 1–1.5 HP unit draws about 5–8 A running and more at start, so use a relay or contactor rated for the aircon (the CJX2 contactor used for the capacitor banks is the safe choice; a 10 A board relay is marginal). Have a licensed electrician do or check this wiring. Some inverter aircons don't turn back on after a power cut until they receive the IR ON, which is why the app sends IR ON after restoring power.
+- The Panasonic is non-inverter. Wait about 3 minutes after turning it OFF before turning it back ON.
 
 ## 3. Presence sensors: 4× HLK-LD2410B (24 GHz mmWave)
 
@@ -216,8 +208,7 @@ Serial line format (one per channel):
 ## 6. Known gaps
 
 - **No spare Pi GPIO.** The thesis design (`docs/DETAILS NG IPAPACODE.pdf`) also mentions RCWL-0516 and HC-SR501 PIR sensors. They are not in the code, and there are no free Pi pins for them. Options: a GPIO expander on I2C (e.g. MCP23017 on the existing GPIO2/3 bus) or moving sensors to the ESP32 (as was done for the aircon IR).
-- **Aircon IR is done on the ESP32** (§2.2), together with a relay per room. The KiCad control-wiring schematic does not show the two IR modules yet.
-- **Relay 20 is no longer a spare.** It now powers the Room 2 aircon.
+- **Aircon IR remote is on the ESP32** (§2.2), with no relay. The KiCad control-wiring schematic does not show the two IR modules yet.
 - **PZEM TTL side runs at 3.3V** (its `5V` pin is fed from ESP32 3V3), so PZEM TX, the mux and the ESP32 all stay at 3.3V and no level shifter is needed. If a PZEM reads unreliably at 3.3V, the fallback is 5V PZEM + 5V mux with level shifters on S0–S3, TX and SIG; ask before rewiring.
 
 ## 7. Pi setup checklist (things the pin map depends on)

@@ -118,7 +118,7 @@ let DEVICE_MAPPING = [
     { id: 4, name: "Living Room Lights", room: "Living Room", pin: "Pin 7 (GPIO 4)", power: 0.00, three_way: true },
     { id: 5, name: "Living Room TV", room: "Living Room", pin: "Pin 29 (GPIO 5)", power: 0.00 },
     { id: 6, name: "Outlet Group 1", room: "Living Room", pin: "Pin 31 (GPIO 6)", power: 0.00 },
-    { id: 7, name: "Air Conditioner Main (ACU)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00, aircon: true },
+    { id: 7, name: "Air Conditioner Main (ACU)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00 },
     { id: 8, name: "Bedroom 1 Lights", room: "Master Bedroom", pin: "Pin 24 (GPIO 8)", power: 0.00, three_way: true },
     { id: 9, name: "Bedroom 1 Outlet Group 2", room: "Master Bedroom", pin: "Pin 21 (GPIO 9)", power: 0.00 },
     { id: 10, name: "Refrigerator (Critical)", room: "Kitchen", pin: "Pin 19 (GPIO 10)", power: 0.00 },
@@ -131,7 +131,7 @@ let DEVICE_MAPPING = [
     { id: 17, name: "Outdoor Security Lights", room: "Outdoor / Garden", pin: "Pin 38 (GPIO 20)", power: 0.00, three_way: true },
     { id: 18, name: "CCTV / Security NVR", room: "Main Panel", pin: "Pin 40 (GPIO 21)", power: 0.00 },
     { id: 19, name: "Standby Outlets", room: "Living Room", pin: "Pin 16 (GPIO 23)", power: 0.00 },
-    { id: 20, name: "Air Conditioner Bedroom 2 (ACU 2)", room: "Bedroom 2", pin: "Pin 18 (GPIO 24)", power: 0.00, aircon: true }
+    { id: 20, name: "Auxiliary Branch", room: "Main Panel", pin: "Pin 18 (GPIO 24)", power: 0.00 }
 ];
 
 let currentRelayStates = {};
@@ -223,7 +223,6 @@ function initLoadControlTable() {
                     </button>
                     <span style="font-size: 10px; color: #8b949e; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${escapeHtml(dev.pin)}</span>
                     ${dev.three_way ? '<span class="badge-3way" title="Electrical 3-way: relay + wall switch">3-WAY</span>' : ''}
-                    ${dev.aircon ? '<span class="badge-3way badge-ir" title="Relay powers the aircon; IR transmitter sends the remote ON/OFF">IR AIRCON</span>' : ''}
                 </div>
             </td>
             <td>
@@ -460,6 +459,7 @@ setInterval(async () => {
             currentRelayStates = data.relays;
             currentLoadMode = data.load_mode || 'AUTO';
             applyLightStates(data.lights || {});
+            if (data.aircons) renderAircons(data.aircons);
             
             let onCount = 0;
             let offCount = 0;
@@ -2040,3 +2040,75 @@ async function refreshRemoteAccess() {
 }
 refreshRemoteAccess();
 setInterval(refreshRemoteAccess, 15000);
+
+// ============================================================================
+// Aircon IR remote (no relay): power, temperature, mode and fan per room.
+// The state shown is the last command sent (the aircon gives no feedback).
+// ============================================================================
+const AC_MODES = [['cool', 'Cool'], ['dry', 'Dry'], ['fan', 'Fan'], ['auto', 'Auto']];
+const AC_FANS = [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Med'], ['high', 'High']];
+let aircons = {};
+let aconLastRender = '';
+let aconBusy = false;
+
+function renderAircons(data) {
+    if (data) aircons = data;
+    const box = document.getElementById('aircon-remotes');
+    if (!box) return;
+    const key = JSON.stringify(aircons);
+    if (key === aconLastRender) return;
+    aconLastRender = key;
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s));
+    box.innerHTML = Object.values(aircons).map(ac => {
+        const on = ac.state === 'ON';
+        const chips = (list, field) => list.map(([val, label]) =>
+            `<button class="ac-chip ${ac[field] === val ? 'active' : ''}" onclick="aconSend(${ac.unit}, {${field}: '${val}'})">${label}</button>`).join('');
+        let note = 'Last command sent by IR';
+        if (!ac.esp32) note = 'ESP32 not connected: commands are not sent';
+        else if (ac.ir_ok === false) note = 'Last IR command failed';
+        return `
+        <div class="ac-remote ${on ? 'is-on' : ''}">
+            <div class="ac-head">
+                <div class="ac-title">
+                    <strong>${esc(ac.name)}</strong>
+                    <small>${esc(ac.room)}</small>
+                </div>
+                <button class="ac-power ${on ? 'on' : ''}" onclick="aconSend(${ac.unit}, {power: '${on ? 'off' : 'on'}'})">
+                    <i class="ph-bold ph-power"></i> ${on ? 'ON' : 'OFF'}
+                </button>
+            </div>
+            <div class="ac-temp">
+                <button class="ac-step" onclick="aconSend(${ac.unit}, {temp: ${ac.temp - 1}})" ${ac.temp <= 16 ? 'disabled' : ''}>−</button>
+                <span class="ac-temp-val">${ac.temp}°C</span>
+                <button class="ac-step" onclick="aconSend(${ac.unit}, {temp: ${ac.temp + 1}})" ${ac.temp >= 30 ? 'disabled' : ''}>+</button>
+            </div>
+            <div class="ac-row"><span>Mode</span><div class="ac-chips">${chips(AC_MODES, 'mode')}</div></div>
+            <div class="ac-row"><span>Fan</span><div class="ac-chips">${chips(AC_FANS, 'fan')}</div></div>
+            <div class="ac-note ${!ac.esp32 || ac.ir_ok === false ? 'warn' : ''}">${note}</div>
+        </div>`;
+    }).join('');
+}
+
+async function aconSend(unit, patch) {
+    if (aconBusy) return;
+    aconBusy = true;
+    try {
+        const res = await fetch('/api/aircon', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ unit, ...patch })
+        });
+        const data = await res.json();
+        if (data.success && data.aircon) {
+            aircons[String(unit)] = data.aircon;
+            renderAircons();
+        } else if (data.message) {
+            alert(data.message);
+        }
+    } catch (e) {
+        alert('Could not reach the Pi.');
+    } finally {
+        aconBusy = false;
+    }
+}
+window.aconSend = aconSend;

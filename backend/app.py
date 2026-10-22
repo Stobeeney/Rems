@@ -36,7 +36,7 @@ relay_pins = {
     10: 10, 11: 11, 12: 12, # Refrigerator (Critical), Kitchen Outlets, Water Heater
     13: 13, 14: 16, 15: 18, # Washing Machine, Microwave, Garage Door & Lights
     16: 19, 17: 20, 18: 21, # Dining Room Lights, Outdoor Lights, CCTV/NVR (Critical)
-    19: 23, 20: 24          # Standby Outlets, Aircon Bedroom 2 (ACU 2)
+    19: 23, 20: 24          # Standby Outlets, Auxiliary Branch
 }
 relays = {}
 relay_status = {}
@@ -219,14 +219,13 @@ def init_db():
             (17, "Outdoor Security Lights", "Outdoor / Garden", "Pin 38 (GPIO 20)", 0.00),
             (18, "CCTV / Security NVR", "Main Panel", "Pin 40 (GPIO 21)", 0.00),
             (19, "Standby Outlets", "Living Room", "Pin 16 (GPIO 23)", 0.00),
-            (20, "Air Conditioner Bedroom 2 (ACU 2)", "Bedroom 2", "Pin 18 (GPIO 24)", 0.00)
+            (20, "Auxiliary Branch", "Main Panel", "Pin 18 (GPIO 24)", 0.00)
         ]
         c.executemany("INSERT INTO devices (id, name, room, pin_desc, power) VALUES (?, ?, ?, ?, ?)", default_devices)
         conn.commit()
-    # Migration: relay 20 was the spare "Auxiliary Branch"; it now powers the Room 2 aircon.
-    # Only rename it if nobody has renamed it already.
-    c.execute("UPDATE devices SET name = ?, room = ? WHERE id = 20 AND name = 'Auxiliary Branch'",
-              ("Air Conditioner Bedroom 2 (ACU 2)", "Bedroom 2"))
+    # Undo an earlier build that used relay 20 for the Room 2 aircon (aircons are IR-only now)
+    c.execute("UPDATE devices SET name = 'Auxiliary Branch', room = 'Main Panel' "
+              "WHERE id = 20 AND name = 'Air Conditioner Bedroom 2 (ACU 2)'")
     conn.commit()
     conn.close()
 
@@ -319,8 +318,6 @@ def load_is_on(r_id):
     """Whether the load is actually powered (sensed light state for 3-way lights)."""
     if r_id in THREE_WAY_LIGHTS:
         return light_state(r_id)[0]
-    if r_id in ACU_RELAYS:
-        return aircon_state[r_id]
     return relay_status.get(r_id, False)
 
 def toggle_relay_position(r_id):
@@ -337,22 +334,43 @@ def toggle_relay_position(r_id):
     return new_pos
 
 # =============================================================================
-# Aircon control: relay (power) + IR transmitter (remote ON/OFF) per room
+# Aircon IR remote (no relay): the app works like the aircon's own remote
 # =============================================================================
-# The IR LEDs are driven by the ESP32 (the Pi has no free GPIO). The Pi sends
-# one JSON line over the same USB serial link: {"cmd":"ir","unit":1,"power":"on"}
-#   ON : relay ON -> wait for the aircon board to boot -> IR power ON
-#   OFF: IR power OFF -> let the unit shut down (fan run-on) -> relay OFF
-# Cutting power while the compressor runs is avoided this way.
-AIRCON_UNITS = {7: 1, 20: 2}      # relay id -> IR unit number on the ESP32 (1 = Room 1, 2 = Room 2)
-ACU_RELAYS = set(AIRCON_UNITS)
-AIRCON_BOOT_SECONDS = 3           # relay ON -> IR ON delay
-AIRCON_SHUTDOWN_SECONDS = 30      # IR OFF -> relay OFF delay
-aircon_state = {r: False for r in AIRCON_UNITS}   # wanted state shown in the apps
-aircon_phase = {r: None for r in AIRCON_UNITS}    # None / "starting" / "stopping"
-aircon_ir_ok = {r: None for r in AIRCON_UNITS}    # last IR send result (None = not sent yet)
-aircon_gen = {r: 0 for r in AIRCON_UNITS}         # bumps on every command; stale sequences stop
+# The IR LEDs are driven by the ESP32 (the Pi has no free GPIO). The Pi sends one
+# JSON line over the same USB serial link, e.g.
+#   {"cmd":"ir","unit":1,"power":"on","temp":24,"mode":"cool","fan":"auto"}
+# There is no feedback from the aircon, so the state shown is the last command sent.
+# If someone uses the original remote, the app will not know.
+AIRCON_UNITS = {
+    1: {"name": "Room 1 Aircon (AUX)", "room": "Master Bedroom"},
+    2: {"name": "Room 2 Aircon (Panasonic)", "room": "Bedroom 2"},
+}
+AIRCON_MODES = ("cool", "dry", "fan", "auto")
+AIRCON_FANS = ("auto", "low", "medium", "high")
+AIRCON_TEMP_MIN, AIRCON_TEMP_MAX = 16, 30
+AIRCON_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aircon_state.json')
 aircon_lock = threading.Lock()
+
+def _load_aircon_state():
+    state = {u: {"power": False, "temp": 24, "mode": "cool", "fan": "auto", "ir_ok": None, "updated": None}
+             for u in AIRCON_UNITS}
+    try:
+        with open(AIRCON_STATE_FILE) as f:
+            saved = json.load(f)
+        for u in AIRCON_UNITS:
+            state[u].update({k: v for k, v in saved.get(str(u), {}).items() if k in state[u]})
+    except (FileNotFoundError, ValueError):
+        pass
+    return state
+
+aircon_state = _load_aircon_state()
+
+def _save_aircon_state():
+    try:
+        with open(AIRCON_STATE_FILE, 'w') as f:
+            json.dump({str(u): st for u, st in aircon_state.items()}, f)
+    except OSError as e:
+        print(f"⚠️ Could not save aircon state: {e}")
 
 esp32_serial = None               # open serial port to the ESP32 (set by esp32_serial_worker)
 esp32_write_lock = threading.Lock()
@@ -371,83 +389,58 @@ def send_esp32_command(payload):
         print(f"⚠️ ESP32 write failed: {e}")
         return False
 
-def _drive_relay(r_id, on):
-    if relays.get(r_id):
-        if on:
-            relays[r_id].on()
-        else:
-            relays[r_id].off()
-    relay_status[r_id] = on
-
 def _capacitor_interlock():
-    """ACU starting -> capacitor banks K1-K3 must be OFF."""
+    """Aircon running -> capacitor banks K1-K3 must be OFF."""
     for cap_id in (1, 2, 3):
         if relay_status.get(cap_id, False):
-            _drive_relay(cap_id, False)
+            if relays.get(cap_id):
+                relays[cap_id].off()
+            relay_status[cap_id] = False
             print(f"🔒 [ACU Interlock]: Capacitor Bank Relay {cap_id} OFF (aircon running).")
 
 def any_acu_on():
-    return any(relay_status.get(r, False) for r in ACU_RELAYS)
+    return relay_status.get(7, False) or any(st["power"] for st in aircon_state.values())
 
-def _aircon_sequence(r_id, want_on, gen):
-    unit = AIRCON_UNITS[r_id]
-    def still_current():
-        return aircon_gen[r_id] == gen
-    try:
-        if want_on:
-            _capacitor_interlock()
-            _drive_relay(r_id, True)
-            time.sleep(AIRCON_BOOT_SECONDS)
-            if not still_current():
-                return
-            aircon_ir_ok[r_id] = send_esp32_command({"cmd": "ir", "unit": unit, "power": "on"})
-        else:
-            aircon_ir_ok[r_id] = send_esp32_command({"cmd": "ir", "unit": unit, "power": "off"})
-            # Without IR (ESP32 offline) the unit is not shutting down by itself: cut power now
-            if aircon_ir_ok[r_id]:
-                time.sleep(AIRCON_SHUTDOWN_SECONDS)
-            if not still_current():
-                return
-            _drive_relay(r_id, False)
-        print(f"❄️ Aircon unit {unit} (Relay {r_id}) {'ON' if want_on else 'OFF'}"
-              f" | IR {'sent' if aircon_ir_ok[r_id] else 'NOT sent (ESP32 offline)'}")
-    finally:
-        if still_current():
-            aircon_phase[r_id] = None
-
-def set_aircon(r_id, want_on):
-    """Starts the relay + IR sequence. Repeating the same command is a no-op."""
+def set_aircon(unit, power=None, temp=None, mode=None, fan=None):
+    """Applies the changes and sends the full remote state by IR (like pressing a remote button)."""
     with aircon_lock:
-        if aircon_state[r_id] == want_on and (aircon_phase[r_id] or relay_status.get(r_id, False) == want_on):
-            return
-        aircon_state[r_id] = want_on
-        aircon_gen[r_id] += 1
-        aircon_phase[r_id] = "starting" if want_on else "stopping"
-        gen = aircon_gen[r_id]
-    threading.Thread(target=_aircon_sequence, args=(r_id, want_on, gen), daemon=True).start()
+        st = aircon_state[unit]
+        if power is not None:
+            st["power"] = bool(power)
+        if temp is not None:
+            st["temp"] = max(AIRCON_TEMP_MIN, min(AIRCON_TEMP_MAX, int(temp)))
+        if mode is not None:
+            st["mode"] = mode
+        if fan is not None:
+            st["fan"] = fan
+        if st["power"]:
+            _capacitor_interlock()
+        st["ir_ok"] = send_esp32_command({"cmd": "ir", "unit": unit, "power": "on" if st["power"] else "off",
+                                          "temp": st["temp"], "mode": st["mode"], "fan": st["fan"]})
+        st["updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _save_aircon_state()
+        print(f"❄️ Aircon {unit} -> {'ON' if st['power'] else 'OFF'} {st['temp']}°C {st['mode']}/{st['fan']}"
+              f" | IR {'sent' if st['ir_ok'] else 'NOT sent (ESP32 offline)'}")
+        return dict(st)
 
 def aircons_snapshot():
-    return {str(r): {
-        "unit": AIRCON_UNITS[r],
-        "state": "ON" if aircon_state[r] else "OFF",
-        "phase": aircon_phase[r],
-        "relay": "ON" if relay_status.get(r, False) else "OFF",
-        "ir_ok": aircon_ir_ok[r],
-        "esp32": esp32_serial is not None
-    } for r in sorted(AIRCON_UNITS)}
+    return {str(u): {**AIRCON_UNITS[u], **aircon_state[u], "unit": u,
+                     "state": "ON" if aircon_state[u]["power"] else "OFF",
+                     "esp32": esp32_serial is not None}
+            for u in sorted(AIRCON_UNITS)}
+
+def turn_off_aircons():
+    for u, st in aircon_state.items():
+        if st["power"]:
+            set_aircon(u, power=False)
 
 def relays_snapshot():
-    """Relay states for the UIs. Aircons report the wanted state (the relay lags on OFF)."""
-    snap = {str(k): ("ON" if v else "OFF") for k, v in relay_status.items()}
-    for r in ACU_RELAYS:
-        snap[str(r)] = "ON" if aircon_state[r] else "OFF"
-    return snap
+    return {str(k): ("ON" if v else "OFF") for k, v in relay_status.items()}
 
 def set_load(r_id, want_on):
     """Drives a load to the wanted state. 3-way lights are toggled only when needed."""
-    if r_id in ACU_RELAYS:
-        set_aircon(r_id, want_on)
-        return
+    if r_id == 7 and want_on:
+        _capacitor_interlock()
     if r_id in THREE_WAY_LIGHTS:
         if load_is_on(r_id) != want_on:
             toggle_relay_position(r_id)
@@ -823,7 +816,7 @@ def control_relay():
         return jsonify({"success": True, "mode": "MANUAL"})
 
     # Safety Interlock: ACU & Capacitor Banks
-    # (Turning an aircon ON shuts K1-K3 inside set_aircon)
+    # (Turning relay 7 or an aircon ON shuts K1-K3; see _capacitor_interlock)
     if action == 'on' and relay_id in [1, 2, 3] and any_acu_on():
         return jsonify({
             "success": False,
@@ -848,9 +841,43 @@ def control_relay():
 
     set_load(relay_id, action == 'on')
     print(f"⚡ Relay {relay_id} (Pin {relay_pins.get(relay_id)}) set {action.upper()}")
-    if relay_id in ACU_RELAYS:
-        note = {**note, "aircon": aircons_snapshot()[str(relay_id)]}
     return jsonify({"success": True, "status": action.upper(), **note})
+
+@app.route('/api/aircon', methods=['GET', 'POST'])
+def aircon_remote():
+    """IR remote for the room aircons. POST {"unit":1, "power":"on"|"off", "temp":24, "mode":"cool", "fan":"auto"}"""
+    if request.method == 'GET':
+        return jsonify({"success": True, "aircons": aircons_snapshot()})
+    data = request.get_json(silent=True) or {}
+    try:
+        unit = int(data.get('unit'))
+    except (TypeError, ValueError):
+        unit = None
+    if unit not in AIRCON_UNITS:
+        return jsonify({"success": False, "message": "Unknown aircon unit"}), 400
+    power = data.get('power')
+    if power is not None:
+        if str(power).lower() not in ('on', 'off', 'true', 'false'):
+            return jsonify({"success": False, "message": "power must be on/off"}), 400
+        power = str(power).lower() in ('on', 'true')
+    temp = data.get('temp')
+    if temp is not None:
+        try:
+            temp = int(temp)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "temp must be a number"}), 400
+    mode = data.get('mode')
+    if mode is not None and mode not in AIRCON_MODES:
+        return jsonify({"success": False, "message": f"mode must be one of {AIRCON_MODES}"}), 400
+    fan = data.get('fan')
+    if fan is not None and fan not in AIRCON_FANS:
+        return jsonify({"success": False, "message": f"fan must be one of {AIRCON_FANS}"}), 400
+    set_aircon(unit, power=power, temp=temp, mode=mode, fan=fan)
+    snap = aircons_snapshot()[str(unit)]
+    resp = {"success": True, "aircon": snap}
+    if not snap["ir_ok"]:
+        resp["note"] = "ESP32 not connected: IR not sent"
+    return jsonify(resp)
 
 @app.route('/api/relay/status', methods=['GET'])
 def relay_status_get():
@@ -893,7 +920,6 @@ def get_devices():
             "power": r[4],
             "sensor_linked": bool(r[5]),
             "three_way": r[0] in THREE_WAY_LIGHTS,
-            "aircon": r[0] in ACU_RELAYS,
             "sensed": RELAY_CHANNEL_MAP.get(r[0]) is not None
         } for r in rows]
         return jsonify({"success": True, "devices": devices, "rooms": DEDICATED_ROOMS})
@@ -995,6 +1021,7 @@ def manage_system_mode():
                 for r_id in range(4, 21):
                     if r_id not in [10, 18]:
                         set_load(r_id, False)
+                turn_off_aircons()
                 print("🔒 Switched to SECURITY MODE: Non-critical outlets cut off. Critical loads preserved.")
             return jsonify({"success": True, "mode": system_mode})
         return jsonify({"success": False, "message": "Invalid mode. Choose MANUAL, AI_ASSISTED, or SECURITY"}), 400
@@ -1040,6 +1067,10 @@ def turn_off_all_active_devices():
         if r_id not in [10, 18] and load_is_on(r_id):
             set_load(r_id, False)
             turned_off.append(r_id)
+    for u, st in aircon_state.items():
+        if st["power"]:
+            set_aircon(u, power=False)
+            turned_off.append(f"aircon-{u}")
     return jsonify({"success": True, "turned_off": turned_off, "count": len(turned_off)}), 200
 
 @app.route('/api/data', methods=['POST'])
