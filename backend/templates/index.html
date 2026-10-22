@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>REMS - Residential Energy Management System</title>
-    <link rel="stylesheet" href="/static/styles_v4.css?v=24">
+    <link rel="stylesheet" href="/static/styles_v4.css?v=25">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Chart.js for graphs -->
@@ -125,6 +125,10 @@
                         <span>Online</span>
                     </div>
                 </div>
+                <div class="pi-ip-box" title="Use this address for SSH or the phone app">
+                    <span>Pi IP Address</span>
+                    <strong id="pi-ip-address">—</strong>
+                </div>
                 <div class="datetime">
                     <span id="current-date">August 06, 2026</span>
                     <span id="current-time">5:25 pm EST</span>
@@ -187,7 +191,7 @@
     <template id="tpl-dashboard">
         <div style="display: flex; flex-direction: column; gap: 16px;">
             <!-- System Controls & Hardware Sensors Row -->
-            <div class="k-stack" style="display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 16px;">
                 <!-- Card A: System Mode Control -->
                 <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
                     <div class="card-header" style="margin-bottom: 6px;">
@@ -299,7 +303,7 @@
             </div>
 
             <!-- Top Stats Row (3 Cards) -->
-            <div class="k-stack" style="display: grid; grid-template-columns: 1.2fr 2fr 1.2fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1.2fr 2fr 1.2fr; gap: 16px;">
                 <!-- Card 1: Total Power Consumed -->
                 <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
                     <div class="card-header">
@@ -346,7 +350,7 @@
             </div>
 
             <!-- Middle Row (3 Cards: Gauge, Trend, Quick Status) -->
-            <div class="k-stack" style="display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 16px;">
                 <!-- Gauge Card -->
                 <div class="card">
                     <div class="card-header">
@@ -416,7 +420,7 @@
             </div>
 
             <!-- Bottom Row (2 Cards: Energy Consumption Bar + Load Distribution Donut) -->
-            <div class="k-stack" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px;">
                 <!-- Bar Chart -->
                 <div class="card">
                     <div class="card-header">
@@ -511,7 +515,7 @@
             <!-- Tab 1: OVERVIEW -->
             <div id="energy-tab-overview" class="energy-subview">
                 <!-- 4 Top Badges -->
-                <div class="k-2col" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
                     <div class="card" style="padding: 12px;">
                         <div style="font-size: 11px; color: var(--text-muted);">Voltage (Avg.)</div>
                         <div style="font-size: 18px; font-weight: 800; color: #60a5fa; margin: 4px 0;"><i class="ph-fill ph-lightning"></i> <span id="em-avg-v">0.0 V</span></div>
@@ -539,7 +543,7 @@
                 </div>
 
                 <!-- 4 Main Branch Charts -->
-                <div class="k-stack" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div class="card">
                         <div class="card-header"><h3>VOLTAGE</h3></div>
                         <div style="height: 140px;"><canvas id="emOverviewVoltageChart"></canvas></div>
@@ -731,7 +735,7 @@
             </div>
 
             <!-- Main Layout: Devices Table (Left) + Overrides/Schedule (Right) -->
-            <div class="k-stack" style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
                 <!-- Left: Devices List Table -->
                 <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
                     <div style="padding: 16px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
@@ -739,8 +743,8 @@
                         <span class="badge-pill badge-info" id="lc-mode-indicator">Mode: AUTO</span>
                     </div>
 
-                    <div class="lc-table-wrap" style="max-height: 420px; overflow-y: auto;">
-                        <table class="dark-table lc-table">
+                    <div style="max-height: 420px; overflow-y: auto;">
+                        <table class="dark-table">
                             <thead>
                                 <tr>
                                     <th>Device</th>
@@ -864,7 +868,7 @@
                     <p style="color: var(--text-muted); font-size: 12px; line-height: 1.6;">
                         Our Gemini AI model analyzes multi-branch electrical data to detect standby power leakage and reactive losses. Insights and savings calculations will begin accumulating once all branch sensors are operational.
                     </p>
-                    <div class="k-stack" style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+                    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
                         <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
                             <div style="font-size: 11px; color: var(--text-muted);">Estimated Monthly Savings</div>
                             <div style="font-size: 20px; font-weight: 800; color: var(--primary); margin-top: 4px;">₱ 0.00</div>
@@ -967,7 +971,7 @@
                 </div>
             </div>
 
-            <div class="k-stack" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <!-- Left: System Settings -->
                 <div class="card">
                     <div class="card-header">
@@ -982,11 +986,11 @@
                         <input type="text" class="form-control" value="Residential Energy Panel #1">
                     </div>
                     <div class="form-group">
-                        <label>Display Size (this screen)</label>
+                        <label>Text Size (this screen)</label>
                         <div class="display-size-group" id="display-size-group">
-                            <button class="btn btn-outline" data-scale="1" onclick="setDisplayScale(1)">Normal</button>
-                            <button class="btn btn-outline" data-scale="1.35" onclick="setDisplayScale(1.35)">Large</button>
-                            <button class="btn btn-outline" data-scale="1.6" onclick="setDisplayScale(1.6)">Extra Large</button>
+                            <button class="btn btn-outline" data-scale="1" onclick="setTextScale(1)">Normal</button>
+                            <button class="btn btn-outline" data-scale="1.3" onclick="setTextScale(1.3)">Large</button>
+                            <button class="btn btn-outline" data-scale="1.5" onclick="setTextScale(1.5)">Extra Large</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -1039,7 +1043,7 @@
             <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px; line-height: 1.6;">
                 Developed for academic engineering thesis compliance featuring real-time multi-branch electrical telemetry, automated power factor correction, mmWave human presence adaptive load control, comprehensive safety interlocking, and AI-driven energy conservation recommendations.
             </p>
-            <div class="k-stack" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 12px;">
                 <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px;">
                     <strong style="color: #ffffff;">Hardware Architecture:</strong>
                     <ul style="margin-top: 8px; margin-left: 18px; color: var(--text-muted); line-height: 1.6;">
@@ -1114,6 +1118,6 @@
     </div>
 
     <!-- Main JavaScript Logic -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=30"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=31"></script>
 </body>
 </html>

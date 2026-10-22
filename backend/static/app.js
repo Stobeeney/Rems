@@ -1103,8 +1103,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebarToggleBtn.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
         });
-        // On the 7" kiosk the sidebar overlays the page, so start hidden
-        if (isCompactScreen()) sidebar.classList.add('collapsed');
     }
 
     // Sidebar navigation click handlers
@@ -1113,7 +1111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', function() {
             const pageId = this.getAttribute('data-page');
             navigateToPage(pageId);
-            if (sidebar && isCompactScreen()) sidebar.classList.add('collapsed');
         });
     });
 
@@ -1965,52 +1962,46 @@ window.syncRtcTime = async function() {
 
 
 // =============================================================================
-// Kiosk Display Size (7" 1024x600 touchscreen)
+// Kiosk Text Size: enlarges text only, the layout stays the same
 // =============================================================================
-const DISPLAY_SCALE_KEY = 'remsDisplayScale';
+const TEXT_SCALE_KEY = 'remsTextScale';
+const KIOSK_DEFAULT_TEXT_SCALE = 1.3;
 
-function isCompactScreen() {
-    return window.matchMedia('(max-width: 1100px)').matches;
+function currentTextScale() {
+    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--text-scale')) || 1;
 }
 
-function currentDisplayScale() {
-    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
-}
-
-function markDisplayScaleButtons() {
-    const scale = currentDisplayScale();
+function markTextScaleButtons() {
+    const scale = currentTextScale();
     document.querySelectorAll('#display-size-group .btn').forEach(btn => {
         btn.classList.toggle('active', Math.abs(parseFloat(btn.dataset.scale) - scale) < 0.01);
     });
 }
 
-function applyDisplayScale(scale) {
-    if (scale) {
-        document.documentElement.style.setProperty('--ui-scale', scale);
-    } else {
-        document.documentElement.style.removeProperty('--ui-scale');
-    }
-    markDisplayScaleButtons();
-    // Charts measure their container; let them re-fit to the new size
+function applyTextScale(scale) {
+    document.documentElement.style.setProperty('--text-scale', scale);
+    markTextScaleButtons();
+    // Charts measure their container; let them re-fit
     window.dispatchEvent(new Event('resize'));
 }
 
-window.setDisplayScale = function(scale) {
-    try { localStorage.setItem(DISPLAY_SCALE_KEY, String(scale)); } catch (e) {}
-    applyDisplayScale(scale);
+window.setTextScale = function(scale) {
+    try { localStorage.setItem(TEXT_SCALE_KEY, String(scale)); } catch (e) {}
+    applyTextScale(scale);
 };
 
-(function restoreDisplayScale() {
+(function restoreTextScale() {
     let saved = null;
-    try { saved = parseFloat(localStorage.getItem(DISPLAY_SCALE_KEY)); } catch (e) {}
-    if (saved && saved >= 0.8 && saved <= 2) {
-        document.documentElement.style.setProperty('--ui-scale', saved);
-    }
+    try { saved = parseFloat(localStorage.getItem(TEXT_SCALE_KEY)); } catch (e) {}
+    // The Pi's own touchscreen starts with large text; other browsers stay at normal
+    const isKiosk = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+    const scale = (saved && saved >= 0.8 && saved <= 2) ? saved : (isKiosk ? KIOSK_DEFAULT_TEXT_SCALE : 1);
+    document.documentElement.style.setProperty('--text-scale', scale);
 })();
 
 // Settings page is rendered from a template; highlight the active size once it is on screen
 new MutationObserver(() => {
-    if (document.getElementById('display-size-group')) markDisplayScaleButtons();
+    if (document.getElementById('display-size-group')) markTextScaleButtons();
 }).observe(document.body, { childList: true, subtree: true });
 
 // =============================================================================
@@ -2045,3 +2036,21 @@ window.exitKioskFullscreen = async function() {
 
 document.addEventListener('fullscreenchange', updateExitKioskButton);
 updateExitKioskButton();
+
+// =============================================================================
+// Pi IP address (sidebar): for SSH and the phone app's server URL
+// =============================================================================
+async function refreshPiIpAddress() {
+    try {
+        const res = await fetch('/api/network');
+        const data = await res.json();
+        const el = document.getElementById('pi-ip-address');
+        if (el && data.success) {
+            const ips = data.ips || [];
+            el.textContent = ips.length ? ips[0] : 'Not connected';
+            el.title = ips.join(', ');
+        }
+    } catch (e) {}
+}
+refreshPiIpAddress();
+setInterval(refreshPiIpAddress, 30000);

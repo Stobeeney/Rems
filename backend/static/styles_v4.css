@@ -40,7 +40,7 @@
 body {
     background-color: var(--bg-main);
     color: var(--text-main);
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     line-height: 1.4;
     overflow-x: hidden;
     user-select: none;
@@ -118,20 +118,20 @@ body {
     justify-content: center;
     position: relative;
     color: var(--primary);
-    font-size: 20px;
+    font-size: calc(20px * var(--text-scale));
     flex-shrink: 0;
 }
 
 .logo-icon .bolt-icon {
     position: absolute;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     bottom: 5px;
     right: 5px;
     color: #facc15;
 }
 
 .logo-text h1 {
-    font-size: 16px;
+    font-size: calc(16px * var(--text-scale));
     font-weight: 800;
     letter-spacing: 0.5px;
     color: #ffffff;
@@ -139,7 +139,7 @@ body {
 }
 
 .logo-text p {
-    font-size: 8.5px;
+    font-size: calc(8.5px * var(--text-scale));
     color: var(--text-muted);
     line-height: 1.1;
     margin-top: 3px;
@@ -167,13 +167,13 @@ body {
     color: #94a3b8;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     font-weight: 500;
     position: relative;
 }
 
 .main-nav li i {
-    font-size: 17px;
+    font-size: calc(17px * var(--text-scale));
 }
 
 .main-nav li:hover {
@@ -192,7 +192,7 @@ body {
     margin-left: auto;
     background-color: var(--accent-red);
     color: white;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     padding: 1px 6px;
     border-radius: 10px;
@@ -209,7 +209,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     color: var(--text-muted);
 }
 
@@ -232,7 +232,7 @@ body {
 .datetime {
     display: flex;
     justify-content: space-between;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     color: var(--text-muted);
 }
 
@@ -264,7 +264,7 @@ body {
 }
 
 .topbar-left h2 {
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.5px;
     color: #ffffff;
@@ -280,7 +280,7 @@ body {
     background: transparent;
     border: none;
     color: var(--text-muted);
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
     cursor: pointer;
     position: relative;
     padding: 4px;
@@ -313,7 +313,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     color: white;
 }
 
@@ -378,7 +378,7 @@ body {
 }
 
 .card-header h3 {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.5px;
     color: var(--text-muted);
@@ -406,7 +406,7 @@ body {
     color: var(--text-muted);
     padding: 6px 14px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -430,7 +430,7 @@ body {
     color: var(--text-main);
     padding: 5px 12px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     outline: none;
     cursor: pointer;
 }
@@ -442,7 +442,7 @@ body {
 .btn {
     padding: 7px 16px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 600;
     cursor: pointer;
     border: none;
@@ -524,7 +524,7 @@ input:checked + .slider:before {
 .badge-pill {
     padding: 3px 10px;
     border-radius: 12px;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 600;
     display: inline-flex;
     align-items: center;
@@ -577,17 +577,17 @@ input:checked + .slider:before {
 }
 
 .category-chip i {
-    font-size: 20px;
+    font-size: calc(20px * var(--text-scale));
     color: var(--primary);
 }
 
 .category-chip-title {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     color: var(--text-muted);
 }
 
 .category-chip-val {
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     font-weight: 700;
     color: #ffffff;
 }
@@ -601,7 +601,7 @@ input:checked + .slider:before {
 
 .dark-table th {
     padding: 10px 14px;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -610,7 +610,7 @@ input:checked + .slider:before {
 
 .dark-table td {
     padding: 12px 14px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -630,14 +630,14 @@ input:checked + .slider:before {
 }
 
 .gauge-val-big {
-    font-size: 28px;
+    font-size: calc(28px * var(--text-scale));
     font-weight: 800;
     color: var(--primary);
     margin-top: -30px;
 }
 
 .gauge-status-sub {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 600;
     color: var(--primary);
     margin-top: 2px;
@@ -682,7 +682,7 @@ input:checked + .slider:before {
     justify-content: center;
     margin: 0 auto 12px auto;
     color: var(--primary);
-    font-size: 28px;
+    font-size: calc(28px * var(--text-scale));
     position: relative;
 }
 
@@ -692,7 +692,7 @@ input:checked + .slider:before {
 
 .form-group label {
     display: block;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 6px;
@@ -706,7 +706,7 @@ input:checked + .slider:before {
     border-radius: 6px;
     padding: 8px 12px;
     color: #ffffff;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     outline: none;
 }
 
@@ -725,7 +725,7 @@ input:checked + .slider:before {
     color: #e2e8f0;
     padding: 4px 8px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 500;
     outline: none;
     cursor: pointer;
@@ -753,7 +753,7 @@ input:checked + .slider:before {
     cursor: pointer;
     padding: 2px 5px;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     display: inline-flex;
     align-items: center;
     transition: all 0.2s ease;
@@ -798,7 +798,7 @@ input:checked + .slider:before {
 }
 .modal-header h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     font-weight: 700;
     color: #ffffff;
 }
@@ -828,14 +828,14 @@ input:checked + .slider:before {
     background: rgba(255, 255, 255, 0.04);
     color: var(--text-main);
     font-family: inherit;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 800;
     cursor: pointer;
     white-space: nowrap;
 }
 
 .btn-light-toggle i {
-    font-size: 15px;
+    font-size: calc(15px * var(--text-scale));
 }
 
 .btn-light-toggle.is-on {
@@ -849,7 +849,7 @@ input:checked + .slider:before {
 }
 
 .badge-3way {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 800;
     color: var(--accent-yellow);
     background: rgba(234, 179, 8, 0.12);
@@ -869,112 +869,6 @@ input:checked + .slider:before {
     color: #000000;
 }
 
-/* =========================================================================
-   Kiosk Display Scaling (7" 1024x600 touchscreen)
-   --ui-scale zooms the whole UI; heights divide by it so the zoomed layout
-   still fills exactly one screen. JS overrides it from the Display Size setting.
-   ========================================================================= */
-:root {
-    --ui-scale: 1;
-}
-
-body {
-    zoom: var(--ui-scale);
-}
-
-.app-container {
-    width: calc(100vw / var(--ui-scale));
-    height: calc(100vh / var(--ui-scale));
-}
-
-.main-content,
-.login-screen {
-    height: calc(100vh / var(--ui-scale));
-}
-
-.login-screen {
-    width: calc(100vw / var(--ui-scale));
-}
-
-@media (max-width: 1100px) {
-    :root {
-        --ui-scale: 1.35;
-    }
-
-    /* Multi-column dashboard rows stack into one scrollable column */
-    .k-stack {
-        grid-template-columns: 1fr !important;
-    }
-
-    .k-2col {
-        grid-template-columns: 1fr 1fr !important;
-    }
-
-    #active-devices-grid {
-        grid-template-columns: 1fr !important;
-    }
-
-    .page-content {
-        padding: 12px;
-    }
-
-    /* Sidebar slides over the content instead of squeezing it */
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: calc(100vh / var(--ui-scale));
-        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.5);
-    }
-
-    .sidebar.collapsed {
-        box-shadow: none;
-    }
-
-    /* Wide tables scroll sideways inside their card, never the page */
-    .dark-table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-
-    /* Load Control: let the page scroll (no nested scroll box), and drop the
-       columns that push the Control switch off-screen */
-    .lc-table-wrap {
-        max-height: none !important;
-        overflow-y: visible !important;
-    }
-
-    .lc-table th:nth-child(3),
-    .lc-table td:nth-child(3),
-    .lc-table th:nth-child(7),
-    .lc-table td:nth-child(7) {
-        display: none;
-    }
-
-    .lc-table th,
-    .lc-table td {
-        padding-left: 8px !important;
-        padding-right: 8px !important;
-    }
-
-    .sidebar .logo p {
-        white-space: normal;
-    }
-
-    /* Finger-sized touch targets */
-    .btn,
-    .mode-btn,
-    .btn-light-toggle,
-    .icon-btn {
-        min-height: 40px;
-    }
-
-    .sidebar li {
-        min-height: 44px;
-    }
-}
-
 /* Exit Fullscreen button (kiosk topbar) */
 .exit-kiosk-btn {
     align-items: center;
@@ -984,34 +878,139 @@ body {
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius-sm);
     color: var(--text-main);
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
     margin-right: 6px;
 }
 
 .exit-kiosk-btn i {
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
 }
 
-/* Official 7" DSI touchscreen (800x480): reclaim width for the controls */
-@media (max-width: 900px) {
-    .lc-table th:nth-child(5),
-    .lc-table td:nth-child(5) {
-        display: none;
-    }
+/* Grid cards may shrink below their text width; text wraps instead of
+   pushing the last card off-screen (same columns as before) */
+.page-content [style*="grid-template-columns"] > * {
+    min-width: 0;
+    overflow-wrap: break-word;
+}
 
-    .topbar {
-        padding: 0 12px;
-    }
+/* Pi IP address in the sidebar footer */
+.pi-ip-box {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background: rgba(255, 255, 255, 0.03);
+    font-size: calc(11px * var(--text-scale));
+    color: var(--text-muted);
+}
 
-    .topbar h2 {
-        white-space: nowrap;
-        font-size: 15px;
-    }
+.pi-ip-box strong {
+    color: var(--primary);
+    font-family: monospace;
+    font-size: calc(13px * var(--text-scale));
+    white-space: normal;
+    word-break: break-all;
+}
 
-    .exit-kiosk-btn span,
-    #display-role,
-    .user-profile .ph-caret-down {
-        display: none;
-    }
+/* =========================================================================
+   Text Size (kiosk): enlarges text only; the layout stays as designed.
+   --text-scale is set from the Settings > Text Size buttons (app.js).
+   Inline font sizes in the templates are matched by attribute below.
+   ========================================================================= */
+:root {
+    --text-scale: 1;
+}
+
+[style*="font-size: 8px"],
+[style*="font-size:8px"] {
+    font-size: calc(8px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 8.5px"],
+[style*="font-size:8.5px"] {
+    font-size: calc(8.5px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 9px"],
+[style*="font-size:9px"] {
+    font-size: calc(9px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 10px"],
+[style*="font-size:10px"] {
+    font-size: calc(10px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 11px"],
+[style*="font-size:11px"] {
+    font-size: calc(11px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 12px"],
+[style*="font-size:12px"] {
+    font-size: calc(12px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 13px"],
+[style*="font-size:13px"] {
+    font-size: calc(13px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 14px"],
+[style*="font-size:14px"] {
+    font-size: calc(14px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 15px"],
+[style*="font-size:15px"] {
+    font-size: calc(15px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 16px"],
+[style*="font-size:16px"] {
+    font-size: calc(16px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 17px"],
+[style*="font-size:17px"] {
+    font-size: calc(17px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 18px"],
+[style*="font-size:18px"] {
+    font-size: calc(18px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 20px"],
+[style*="font-size:20px"] {
+    font-size: calc(20px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 22px"],
+[style*="font-size:22px"] {
+    font-size: calc(22px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 24px"],
+[style*="font-size:24px"] {
+    font-size: calc(24px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 28px"],
+[style*="font-size:28px"] {
+    font-size: calc(28px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 32px"],
+[style*="font-size:32px"] {
+    font-size: calc(32px * var(--text-scale)) !important;
+}
+
+[style*="font-size: 48px"],
+[style*="font-size:48px"] {
+    font-size: calc(48px * var(--text-scale)) !important;
 }

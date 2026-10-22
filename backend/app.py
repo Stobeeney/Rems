@@ -416,6 +416,30 @@ def is_local_kiosk_request():
     proxy_headers = ('CF-Connecting-IP', 'X-Forwarded-For', 'X-Real-IP', 'Forwarded')
     return not any(request.headers.get(h) for h in proxy_headers)
 
+def get_lan_ips():
+    """IPv4 addresses of this Pi on the local network (for SSH / phone setup)."""
+    ips = []
+    try:
+        out = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=2).stdout
+        ips = [ip for ip in out.split() if '.' in ip and not ip.startswith('127.')]
+    except Exception:
+        pass
+    if not ips:
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('10.255.255.255', 1))  # no packet is sent; just picks the LAN interface
+            ips = [s.getsockname()[0]]
+            s.close()
+        except Exception:
+            pass
+    return ips
+
+@app.route('/api/network', methods=['GET'])
+def network_info():
+    import socket
+    return jsonify({"success": True, "hostname": socket.gethostname(), "ips": get_lan_ips()})
+
 @app.route('/api/kiosk/exit', methods=['POST'])
 def exit_kiosk_browser():
     """Closes the full-screen kiosk Chromium on the Pi so the desktop is reachable."""
