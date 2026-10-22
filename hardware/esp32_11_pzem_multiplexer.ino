@@ -12,12 +12,16 @@
 #define IR_PIN_UNIT1 4   // Room 1 (Master Bedroom) aircon, paired with Pi relay 7
 #define IR_PIN_UNIT2 13  // Room 2 (Bedroom 2) aircon, paired with Pi relay 20
 
-// !! SET THESE to your aircon brand's protocol. To find it, wire a VS1838B IR receiver
-// to any free GPIO, flash the library example "IRrecvDumpV2", point the original remote
-// at it, and press ON. The "Protocol :" line shows the name (e.g. COOLIX, DAIKIN,
-// CARRIER_AC, MIDEA, GREE, PANASONIC_AC, LG, SAMSUNG_AC, TCL112AC, KELON).
-const decode_type_t AC_PROTOCOL_UNIT1 = decode_type_t::COOLIX;
-const decode_type_t AC_PROTOCOL_UNIT2 = decode_type_t::COOLIX;
+// Aircon brand protocol + model per room. Swap the two units if the rooms are reversed.
+//   AUX ASW-09A2/QCDI (inverter)  -> ELECTRA_AC (the library's AUX protocol), model 1
+//   Panasonic CS-PC9KKQ           -> PANASONIC_AC, model 3 (DKE) is the usual remote;
+//                                    older A75C2311-type remotes are model 5 (CKP)
+// To confirm: wire a VS1838B IR receiver to a free GPIO, flash the library example
+// "IRrecvDumpV2", press ON on the original remote. It prints "Protocol :" and "Model:".
+const decode_type_t AC_PROTOCOL_UNIT1 = decode_type_t::ELECTRA_AC;   // Room 1: AUX
+const int16_t       AC_MODEL_UNIT1    = 1;
+const decode_type_t AC_PROTOCOL_UNIT2 = decode_type_t::PANASONIC_AC; // Room 2: Panasonic
+const int16_t       AC_MODEL_UNIT2    = 3;                            // 3 = DKE, 5 = CKP
 const float AC_SET_TEMP_C = 24.0;   // temperature sent with the ON command
 
 IRac acUnit1(IR_PIN_UNIT1);
@@ -47,9 +51,9 @@ void selectMuxChannel(uint8_t ch) {
     delay(20); // Switching settling time
 }
 
-void setupAircon(IRac &ac, decode_type_t protocol) {
+void setupAircon(IRac &ac, decode_type_t protocol, int16_t model) {
     ac.next.protocol = protocol;
-    ac.next.model = 1;
+    ac.next.model = model;
     ac.next.mode = stdAc::opmode_t::kCool;
     ac.next.celsius = true;
     ac.next.degrees = AC_SET_TEMP_C;
@@ -110,8 +114,8 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
-    setupAircon(acUnit1, AC_PROTOCOL_UNIT1);
-    setupAircon(acUnit2, AC_PROTOCOL_UNIT2);
+    setupAircon(acUnit1, AC_PROTOCOL_UNIT1, AC_MODEL_UNIT1);
+    setupAircon(acUnit2, AC_PROTOCOL_UNIT2, AC_MODEL_UNIT2);
 
     pinMode(PIN_S0, OUTPUT);
     pinMode(PIN_S1, OUTPUT);
