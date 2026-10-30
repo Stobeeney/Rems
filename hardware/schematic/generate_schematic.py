@@ -39,6 +39,8 @@ MUX_SEL = [int(ino_define[f"PIN_S{i}"]) for i in range(4)]
 ESP_RX, ESP_TX = int(ino_define["PZEM_RX_PIN"]), int(ino_define["PZEM_TX_PIN"])
 N_PZEM = int(ino_define["TOTAL_PZEM_CHANNELS"])
 IR_PINS = [int(ino_define["IR_PIN_UNIT1"]), int(ino_define["IR_PIN_UNIT2"])]
+SEL_NET = [f"S{i}_GPIO{g}" for i, g in enumerate(MUX_SEL)]          # e.g. S0_GPIO25 (both muxes)
+MUXA_SIG, MUXB_SIG = f"MUXA_SIG_GPIO{ESP_RX}", f"MUXB_SIG_GPIO{ESP_TX}"
 
 assert sorted(relay_pins) == list(range(1, 21)), "expected relays 1..20 in backend/app.py"
 assert len(set(relay_pins.values()) | set(hlk_pins.values())) == 24, "GPIO used twice?"
@@ -204,23 +206,23 @@ for k, (zone, gpio) in enumerate(sorted(hlk_pins.items())):
 U6 = Part("U6", "ESP32 DevKit (USB to Pi)", "ESP32_DevKit",
           [("1", "VBUS(5V)", "L", "USB_VBUS"), ("2", "D-", "L", "USB_DN"), ("3", "D+", "L", "USB_DP"),
            ("4", "GND", "L", "GND"),
-           ("5", f"GPIO{MUX_SEL[0]}", "R", "MUX_S0"), ("6", f"GPIO{MUX_SEL[1]}", "R", "MUX_S1"),
-           ("7", f"GPIO{MUX_SEL[2]}", "R", "MUX_S2"), ("8", f"GPIO{MUX_SEL[3]}", "R", "MUX_S3"),
-           ("9", f"GPIO{ESP_RX}/RX1", "R", "MUXA_SIG_RX"), ("10", f"GPIO{ESP_TX}/TX1", "R", "MUXB_SIG_TX"),
+           ("5", f"GPIO{MUX_SEL[0]}", "R", SEL_NET[0]), ("6", f"GPIO{MUX_SEL[1]}", "R", SEL_NET[1]),
+           ("7", f"GPIO{MUX_SEL[2]}", "R", SEL_NET[2]), ("8", f"GPIO{MUX_SEL[3]}", "R", SEL_NET[3]),
+           ("9", f"GPIO{ESP_RX}/RX1", "R", MUXA_SIG), ("10", f"GPIO{ESP_TX}/TX1", "R", MUXB_SIG),
            ("11", f"GPIO{IR_PINS[0]}", "R", "IR1_DAT"), ("12", f"GPIO{IR_PINS[1]}", "R", "IR2_DAT"),
            ("13", "3V3", "R", "ESP_3V3"), ("14", "GND", "R", "GND")], 8.89)
 
 def mux_part(ref, value, sig_net, channel_net):
     """CD74HC4067 breakout. Both muxes share S0-S3, so one channel number selects the same PZEM on both."""
-    pins = [("1", "SIG", "L", sig_net)] + [(str(2 + i), f"S{i}", "L", f"MUX_S{i}") for i in range(4)]
+    pins = [("1", "SIG", "L", sig_net)] + [(str(2 + i), f"S{i}", "L", SEL_NET[i]) for i in range(4)]
     pins += [("6", "EN", "L", "GND"), ("7", "VCC", "L", "ESP_3V3"), ("8", "GND", "L", "GND")]
     pins += [(str(9 + c), f"C{c}", "R", f"{channel_net}{c}" if c < N_PZEM else None) for c in range(16)]
     return Part(ref, value, "CD74HC4067_Module", pins, 7.62)
 
 
 # Mux A: selected PZEM TX -> ESP32 RX1.  Mux B: ESP32 TX1 -> selected PZEM RX only.
-U7 = mux_part("U7", "Mux A CD74HC4067 (PZEM TX -> ESP32 RX)", "MUXA_SIG_RX", "PZEM_TX_C")
-U19 = mux_part("U19", "Mux B CD74HC4067 (ESP32 TX -> PZEM RX)", "MUXB_SIG_TX", "PZEM_RX_C")
+U7 = mux_part("U7", "Mux A CD74HC4067 (PZEM TX -> ESP32 RX)", MUXA_SIG, "PZEM_TX_C")
+U19 = mux_part("U19", "Mux B CD74HC4067 (ESP32 TX -> PZEM RX)", MUXB_SIG, "PZEM_RX_C")
 
 pzem_parts = []
 for ch in range(N_PZEM):
@@ -283,6 +285,33 @@ text(items, 300, 16, [
     "10. Both mux EN = GND (always on). C11-C15 unused.",
     "    IR modules: VCC = ESP32 5V/VIN (USB_VBUS).",
     "11. Control wiring only: mains side not shown.",
+], 1.27)
+
+MUX_TABLE = [
+    ("Mux pin", "Mux A (U7)", "Mux B (U19)"),
+    ("S0", f"ESP32 GPIO{MUX_SEL[0]}", f"ESP32 GPIO{MUX_SEL[0]}  (same wire)"),
+    ("S1", f"ESP32 GPIO{MUX_SEL[1]}", f"ESP32 GPIO{MUX_SEL[1]}  (same wire)"),
+    ("S2", f"ESP32 GPIO{MUX_SEL[2]}", f"ESP32 GPIO{MUX_SEL[2]}  (same wire)"),
+    ("S3", f"ESP32 GPIO{MUX_SEL[3]}", f"ESP32 GPIO{MUX_SEL[3]}  (same wire)"),
+    ("SIG", f"ESP32 GPIO{ESP_RX} (RX1)", f"ESP32 GPIO{ESP_TX} (TX1)"),
+    ("VCC", "ESP32 3V3", "ESP32 3V3"),
+    ("GND", "ESP32 GND", "ESP32 GND"),
+    ("EN", "GND", "GND"),
+    (f"C0-C{N_PZEM - 1}", f"TX of PZEM #0-#{N_PZEM - 1}", f"RX of PZEM #0-#{N_PZEM - 1}"),
+    (f"C{N_PZEM}-C15", "open", "open"),
+]
+TX0, TY0 = 300, 76
+text(items, TX0, TY0, ["MUX WIRING  (2x CD74HC4067, Mux A + Mux B)"], 1.5, True)
+for col, cx in enumerate((TX0, TX0 + 22, TX0 + 62)):
+    text(items, cx, TY0 + 6, [row[col] for row in MUX_TABLE], 1.27, False)
+text(items, TX0, TY0 + 6 + len(MUX_TABLE) * 2.54 + 3, [
+    "- S0-S3, VCC and GND go to BOTH muxes: one wire from the ESP32,",
+    "  then jump Mux A S0 -> Mux B S0 (or split it with a Y splice).",
+    "  Same for S1, S2, S3, VCC, GND/EN. Only SIG is different.",
+    "- Channel Cn = PZEM #n on BOTH muxes: its TX on Mux A Cn,",
+    "  its RX on Mux B Cn. Wrong channel = that PZEM shows STANDBY.",
+    "- Both muxes switch together: ESP32 asks PZEM #n through Mux B,",
+    "  PZEM #n answers through Mux A.",
 ], 1.27)
 
 # --------------------------------------------------------------------------- write
