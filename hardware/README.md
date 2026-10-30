@@ -19,12 +19,15 @@ If you change a pin in code, regenerate it: `python3 hardware/schematic/generate
  │                  │◀─I2C──── DS3231 RTC (0x68)                 │
  └──────────────────┘                                     ┌──────┴──────┐
                                                           │    ESP32    │
-                                       S0–S3 ┌───────────▶│ GPIO25/26/  │
-                                             │            │ 27/32       │
-                      ┌──────────────────────┴─┐  SIG     │ GPIO19 RX1  │
- PZEM #0..#10 TX ────▶│ CD74HC4067 C0..C10     │─────────▶│             │
-                      └────────────────────────┘          │ GPIO18 TX1  │
- PZEM #0..#10 RX ◀──── shared bus (3.3V) ◀───────────────│             │
+                                  S0–S3 (shared) ┌───────▶│ GPIO25/26/  │
+                                                 │        │ 27/32       │
+                      ┌──────────────────────────┤  SIG   │             │
+ PZEM #0..#10 TX ────▶│ Mux A CD74HC4067 C0..C10 │───────▶│ GPIO19 RX1  │
+                      └──────────────────────────┤        │             │
+                      ┌──────────────────────────┤  SIG   │             │
+ PZEM #0..#10 RX ◀────│ Mux B CD74HC4067 C0..C10 │◀───────│ GPIO18 TX1  │
+                      └──────────────────────────┘        │             │
+ IR transmitter Room 1 / Room 2 DAT ◀─────────────────────│ GPIO4 / 13  │
                                                           └─────────────┘
 ```
 
@@ -162,6 +165,8 @@ HLK-LD2410B OUT is a 3.3V signal, so it connects straight to the Pi.
 
 ## 4. DS3231 RTC (I2C, address 0x68)
 
+The RTC is on the **Pi**, not the ESP32. The ESP32 has no RTC; readings are timestamped by the Pi when they arrive.
+
 | DS3231 | Pi |
 |---|---|
 | VCC | Pin 1 (3V3) |
@@ -171,30 +176,51 @@ HLK-LD2410B OUT is a 3.3V signal, so it connects straight to the Pi.
 
 Enable with `dtparam=i2c_arm=on` and `dtoverlay=i2c-rtc,ds3231` in `/boot/firmware/config.txt`. `/api/rtc/sync` runs `hwclock -s`.
 
-## 5. ESP32 + CD74HC4067 + 11× PZEM-004T v3.0
+## 5. ESP32 + 2× CD74HC4067 + 11× PZEM-004T v3.0
 
-One shared UART reads 11 PZEMs. The ESP32 TX goes to **all** PZEM RX pins, and the mux selects which PZEM TX is routed back to the ESP32 RX.
+Two muxes on **the same S0–S3 wires**, so one channel number selects the same PZEM on both:
 
-| ESP32 | Connects to | Purpose |
+- **Mux A (RX mux):** routes the selected PZEM's **TX** back to ESP32 RX1.
+- **Mux B (TX mux):** routes ESP32 TX1 to the selected PZEM's **RX only**. The ESP32 pin drives one PZEM optocoupler instead of 11 at once, and only the selected PZEM hears the request.
+
+No firmware change is needed for Mux B. `selectMuxChannel()` already sets S0–S3, and that switches both muxes together.
+
+### ESP32 pins (all of them)
+
+| ESP32 pin | Connects to | Purpose |
 |---|---|---|
-| GPIO25 | CD74HC4067 **S0** | channel select bit 0 |
-| GPIO26 | CD74HC4067 **S1** | channel select bit 1 |
-| GPIO27 | CD74HC4067 **S2** | channel select bit 2 |
-| GPIO32 | CD74HC4067 **S3** | channel select bit 3 |
-| GPIO19 (UART1 RX) | CD74HC4067 **SIG** | selected PZEM's TX |
-| GPIO18 (UART1 TX) | **every** PZEM RX (direct, 3.3V) | Modbus request (shared bus) |
+| GPIO25 | Mux A **S0** + Mux B **S0** | channel select bit 0 |
+| GPIO26 | Mux A **S1** + Mux B **S1** | channel select bit 1 |
+| GPIO27 | Mux A **S2** + Mux B **S2** | channel select bit 2 |
+| GPIO32 | Mux A **S3** + Mux B **S3** | channel select bit 3 |
+| GPIO19 (UART1 RX) | Mux A **SIG** | selected PZEM's TX → ESP32 |
+| GPIO18 (UART1 TX) | Mux B **SIG** | ESP32 → selected PZEM's RX |
 | GPIO4 | IR transmitter **unit 1** DAT (Room 1 aircon) | see §2.2 |
 | GPIO13 | IR transmitter **unit 2** DAT (Room 2 aircon) | see §2.2 |
-| USB | Raspberry Pi USB | JSON telemetry @ 115200 baud, plus aircon IR commands from the Pi |
-| 3V3 / GND | mux VCC / GND, every PZEM TTL `5V` / GND pin | whole ESP32 side runs at 3.3V |
+| 5V / VIN | IR transmitter 1 + 2 **VCC** | IR LED driver power |
+| 3V3 | Mux A VCC, Mux B VCC, every PZEM TTL `5V` pin | whole ESP32 logic side runs at 3.3V |
+| GND | Mux A GND + EN, Mux B GND + EN, every PZEM GND, IR GND | common ground |
+| USB | Raspberry Pi USB-A | JSON telemetry @ 115200 baud, plus aircon IR commands from the Pi |
 
-| CD74HC4067 | Connects to |
-|---|---|
-| C0 | PZEM #0 TX: **Main Panel** |
-| C1 – C10 | PZEM #1 – #10 TX: **Branch 1 – 10** |
-| C11 – C15 | unused (tie to GND or leave open) |
-| EN | GND (always enabled; not driven by code) |
-| VCC / GND | ESP32 3V3 / GND |
+### Mux channels (same on both muxes)
+
+| Channel | Mux A Cn ← | Mux B Cn → | Circuit |
+|---|---|---|---|
+| C0 | PZEM #0 **TX** | PZEM #0 **RX** | Main Panel |
+| C1 | PZEM #1 TX | PZEM #1 RX | Branch 1 (Relay 4) |
+| C2 | PZEM #2 TX | PZEM #2 RX | Branch 2 (Relay 5) |
+| C3 | PZEM #3 TX | PZEM #3 RX | Branch 3 (Relay 6) |
+| C4 | PZEM #4 TX | PZEM #4 RX | Branch 4 (Relay 7) |
+| C5 | PZEM #5 TX | PZEM #5 RX | Branch 5 (Relay 8) |
+| C6 | PZEM #6 TX | PZEM #6 RX | Branch 6 (Relay 9) |
+| C7 | PZEM #7 TX | PZEM #7 RX | Branch 7 (Relay 10) |
+| C8 | PZEM #8 TX | PZEM #8 RX | Branch 8 (Relay 11) |
+| C9 | PZEM #9 TX | PZEM #9 RX | Branch 9 (Relay 12) |
+| C10 | PZEM #10 TX | PZEM #10 RX | Branch 10 (Relay 13) |
+| C11 – C15 | unused (leave open) | unused (leave open) | |
+| EN | GND | GND | always enabled; not driven by code |
+
+**Check before power-up:** PZEM #n must be on **Cn of both muxes**. If its TX is on C3 of Mux A but its RX is on C4 of Mux B, that PZEM never answers (status `STANDBY`).
 
 **Branch ↔ relay mapping used by the software:** branch `Cn` is treated as the circuit of **relay n+3** (C1 = Relay 4 … C10 = Relay 13). Relays 1–3 and 14–20 have no dedicated PZEM (see FIX_PLAN.md LOGIC-2).
 

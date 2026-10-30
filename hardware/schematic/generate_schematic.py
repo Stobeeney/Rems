@@ -3,7 +3,8 @@
 
 Sources of truth:
   backend/app.py                          relay_pins, HLK_PINS (Raspberry Pi 5 GPIO)
-  hardware/esp32_11_pzem_multiplexer.ino  PIN_S0..S3, PZEM_RX_PIN, PZEM_TX_PIN, TOTAL_PZEM_CHANNELS
+  hardware/esp32_11_pzem_multiplexer.ino  PIN_S0..S3, PZEM_RX_PIN, PZEM_TX_PIN, TOTAL_PZEM_CHANNELS,
+                                          IR_PIN_UNIT1, IR_PIN_UNIT2
 
 Every connection is a named net: each pin gets a short wire stub ending in a net label, and
 pins with the same label are connected (standard KiCad net-label wiring). Control wiring only;
@@ -37,6 +38,7 @@ ino_define = {k: v for k, v in re.findall(r"#define\s+(\w+)\s+(\d+)", ino_src)}
 MUX_SEL = [int(ino_define[f"PIN_S{i}"]) for i in range(4)]
 ESP_RX, ESP_TX = int(ino_define["PZEM_RX_PIN"]), int(ino_define["PZEM_TX_PIN"])
 N_PZEM = int(ino_define["TOTAL_PZEM_CHANNELS"])
+IR_PINS = [int(ino_define["IR_PIN_UNIT1"]), int(ino_define["IR_PIN_UNIT2"])]
 
 assert sorted(relay_pins) == list(range(1, 21)), "expected relays 1..20 in backend/app.py"
 assert len(set(relay_pins.values()) | set(hlk_pins.values())) == 24, "GPIO used twice?"
@@ -204,21 +206,34 @@ U6 = Part("U6", "ESP32 DevKit (USB to Pi)", "ESP32_DevKit",
            ("4", "GND", "L", "GND"),
            ("5", f"GPIO{MUX_SEL[0]}", "R", "MUX_S0"), ("6", f"GPIO{MUX_SEL[1]}", "R", "MUX_S1"),
            ("7", f"GPIO{MUX_SEL[2]}", "R", "MUX_S2"), ("8", f"GPIO{MUX_SEL[3]}", "R", "MUX_S3"),
-           ("9", f"GPIO{ESP_RX}/RX1", "R", "MUX_SIG"), ("10", f"GPIO{ESP_TX}/TX1", "R", "PZEM_RX_BUS"),
-           ("11", "3V3", "R", "ESP_3V3"), ("12", "GND", "R", "GND")], 8.89)
+           ("9", f"GPIO{ESP_RX}/RX1", "R", "MUXA_SIG_RX"), ("10", f"GPIO{ESP_TX}/TX1", "R", "MUXB_SIG_TX"),
+           ("11", f"GPIO{IR_PINS[0]}", "R", "IR1_DAT"), ("12", f"GPIO{IR_PINS[1]}", "R", "IR2_DAT"),
+           ("13", "3V3", "R", "ESP_3V3"), ("14", "GND", "R", "GND")], 8.89)
 
-mux_pins = [("1", "SIG", "L", "MUX_SIG")] + [(str(2 + i), f"S{i}", "L", f"MUX_S{i}") for i in range(4)]
-mux_pins += [("6", "EN", "L", "GND"), ("7", "VCC", "L", "ESP_3V3"), ("8", "GND", "L", "GND")]
-mux_pins += [(str(9 + c), f"C{c}", "R", f"PZEM_TX_C{c}" if c < N_PZEM else None) for c in range(16)]
-U7 = Part("U7", "CD74HC4067 mux breakout", "CD74HC4067_Module", mux_pins, 7.62)
+def mux_part(ref, value, sig_net, channel_net):
+    """CD74HC4067 breakout. Both muxes share S0-S3, so one channel number selects the same PZEM on both."""
+    pins = [("1", "SIG", "L", sig_net)] + [(str(2 + i), f"S{i}", "L", f"MUX_S{i}") for i in range(4)]
+    pins += [("6", "EN", "L", "GND"), ("7", "VCC", "L", "ESP_3V3"), ("8", "GND", "L", "GND")]
+    pins += [(str(9 + c), f"C{c}", "R", f"{channel_net}{c}" if c < N_PZEM else None) for c in range(16)]
+    return Part(ref, value, "CD74HC4067_Module", pins, 7.62)
+
+
+# Mux A: selected PZEM TX -> ESP32 RX1.  Mux B: ESP32 TX1 -> selected PZEM RX only.
+U7 = mux_part("U7", "Mux A CD74HC4067 (PZEM TX -> ESP32 RX)", "MUXA_SIG_RX", "PZEM_TX_C")
+U19 = mux_part("U19", "Mux B CD74HC4067 (ESP32 TX -> PZEM RX)", "MUXB_SIG_TX", "PZEM_RX_C")
 
 pzem_parts = []
 for ch in range(N_PZEM):
     label = "Main Panel" if ch == 0 else f"Branch {ch} (R{ch + 3})"
     pzem_parts.append(Part(f"U{8 + ch}", f"PZEM #{ch} {label}", "PZEM004T_v3_TTL",
-                           [("1", "5V", "L", "ESP_3V3"), ("2", "RX", "L", "PZEM_RX_BUS"),
+                           [("1", "5V", "L", "ESP_3V3"), ("2", "RX", "L", f"PZEM_RX_C{ch}"),
                             ("3", "TX", "L", f"PZEM_TX_C{ch}"), ("4", "GND", "L", "GND")], 6.35,
                            description="TTL side powered from ESP32 3V3"))
+
+ir_parts = [Part(f"U{20 + k}", f"IR transmitter {k + 1} - {room}", "IR_TX_Module",
+                 [("1", "DAT", "L", f"IR{k + 1}_DAT"), ("2", "VCC", "L", "USB_VBUS"), ("3", "GND", "L", "GND")], 6.35,
+                 description="In the room, facing the aircon receiver")
+            for k, room in enumerate(["Room 1 aircon (AUX)", "Room 2 aircon (Panasonic)"])]
 
 # --------------------------------------------------------------------------- layout (A2, mm, y down)
 sheet_uuid = uid()
@@ -233,13 +248,16 @@ K1.place(272, 80, sheet_uuid, items, net_use)
 PS1.place(232, 128, sheet_uuid, items, net_use)
 
 U6.place(42, 205, sheet_uuid, items, net_use)
-U7.place(118, 205, sheet_uuid, items, net_use)
+U7.place(118, 196, sheet_uuid, items, net_use)
+U19.place(118, 256, sheet_uuid, items, net_use)
+for k, p in enumerate(ir_parts):
+    p.place(42, 248 + k * 22, sheet_uuid, items, net_use)
 for ch, p in enumerate(pzem_parts):
     col, row = ch % 4, ch // 4
     p.place(190 + col * 56, 168 + row * 32, sheet_uuid, items, net_use)
 
 text(items, 15, 16, ["RASPBERRY PI 5 DOMAIN  (relays, presence sensors, RTC)"], 1.8, True)
-text(items, 15, 150, ["ESP32 DOMAIN  (11x PZEM-004T via CD74HC4067, all 3.3V logic)"], 1.8, True)
+text(items, 15, 150, ["ESP32 DOMAIN  (11x PZEM-004T via 2x CD74HC4067, 2x aircon IR, 3.3V logic)"], 1.8, True)
 text(items, 300, 16, [
     "WIRING NOTES",
     "1. Same label name = same wire. Connect every pin that shares a label.",
@@ -259,15 +277,17 @@ text(items, 300, 16, [
     "   config.txt: gpio=9-13,16-24,27=op,dh",
     "8. ESP32 side is all 3.3V: PZEM TTL '5V' pins and mux",
     "   VCC come from ESP32 3V3 (ESP_3V3). No level shifter.",
-    "9. PZEM_RX_BUS: ESP32 TX1 -> RX of ALL PZEMs. The mux",
-    "   returns only the selected PZEM TX to ESP32 RX1.",
-    "10. Mux EN = GND (always on). C11-C15 unused.",
+    "9. Two muxes, same S0-S3 wires: Mux A sends the selected",
+    "   PZEM TX to ESP32 RX1, Mux B sends ESP32 TX1 to that",
+    "   PZEM RX only. Channel Cn = PZEM #n on BOTH muxes.",
+    "10. Both mux EN = GND (always on). C11-C15 unused.",
+    "    IR modules: VCC = ESP32 5V/VIN (USB_VBUS).",
     "11. Control wiring only: mains side not shown.",
 ], 1.27)
 
 # --------------------------------------------------------------------------- write
 lib = "\n".join(p.lib_symbol() for p in
-                {type(p).__name__ + p.lib_name: p for p in [J1, J2, K1, PS1, U1, *hlk_parts, U6, U7, *pzem_parts]}.values())
+                {type(p).__name__ + p.lib_name: p for p in [J1, J2, K1, PS1, U1, *hlk_parts, U6, U7, U19, *pzem_parts, *ir_parts]}.values())
 doc = f"""(kicad_sch
 (version 20250114)
 (generator "rems_generate_schematic")
