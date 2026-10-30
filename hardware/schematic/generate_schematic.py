@@ -40,7 +40,9 @@ ESP_RX, ESP_TX = int(ino_define["PZEM_RX_PIN"]), int(ino_define["PZEM_TX_PIN"])
 N_PZEM = int(ino_define["TOTAL_PZEM_CHANNELS"])
 IR_PINS = [int(ino_define["IR_PIN_UNIT1"]), int(ino_define["IR_PIN_UNIT2"])]
 SEL_NET = [f"S{i}_GPIO{g}" for i, g in enumerate(MUX_SEL)]          # e.g. S0_GPIO25 (both muxes)
-MUXA_SIG, MUXB_SIG = f"MUXA_SIG_GPIO{ESP_RX}", f"MUXB_SIG_GPIO{ESP_TX}"
+# UART goes through the 4-ch logic level converter: GPIO (3.3V, LV side) <-> mux SIG (5V, HV side)
+ESP_RX_NET, ESP_TX_NET = f"GPIO{ESP_RX}_RX_LV1", f"GPIO{ESP_TX}_TX_LV2"
+MUXA_SIG, MUXB_SIG = "MUXA_SIG_HV1", "MUXB_SIG_HV2"
 
 assert sorted(relay_pins) == list(range(1, 21)), "expected relays 1..20 in backend/app.py"
 assert len(set(relay_pins.values()) | set(hlk_pins.values())) == 24, "GPIO used twice?"
@@ -182,7 +184,7 @@ J1 = Part("J1", "Raspberry Pi 5 - 40-pin GPIO header", "RPi5_GPIO_Header", pi_pi
           description="Pin numbers are PHYSICAL header pins")
 
 J2 = Part("J2", "Raspberry Pi 5 - USB-A port", "RPi5_USB_A",
-          [("1", "VBUS", "R", "USB_VBUS"), ("2", "D-", "R", "USB_DN"), ("3", "D+", "R", "USB_DP"), ("4", "GND", "R", "GND")], 6.35)
+          [("1", "VBUS", "R", "USB_5V"), ("2", "D-", "R", "USB_DN"), ("3", "D+", "R", "USB_DP"), ("4", "GND", "R", "GND")], 6.35)
 
 relay_board_pins = [(str(i), f"IN{i}", "L", RELAY_NET[i]) for i in range(1, 21)]
 relay_board_pins += [("21", "VCC", "L", "+3V3"), ("22", "GND", "L", "RLY_PSU_GND"), ("23", "JD-VCC", "L", "RLY_PSU_5V")]
@@ -204,18 +206,18 @@ for k, (zone, gpio) in enumerate(sorted(hlk_pins.items())):
                            ("4", "GND", "L", "GND"), ("5", "VCC", "L", "+5V")], 7.62))
 
 U6 = Part("U6", "ESP32 DevKit (USB to Pi)", "ESP32_DevKit",
-          [("1", "VBUS(5V)", "L", "USB_VBUS"), ("2", "D-", "L", "USB_DN"), ("3", "D+", "L", "USB_DP"),
+          [("1", "VBUS(5V)", "L", "USB_5V"), ("2", "D-", "L", "USB_DN"), ("3", "D+", "L", "USB_DP"),
            ("4", "GND", "L", "GND"),
            ("5", f"GPIO{MUX_SEL[0]}", "R", SEL_NET[0]), ("6", f"GPIO{MUX_SEL[1]}", "R", SEL_NET[1]),
            ("7", f"GPIO{MUX_SEL[2]}", "R", SEL_NET[2]), ("8", f"GPIO{MUX_SEL[3]}", "R", SEL_NET[3]),
-           ("9", f"GPIO{ESP_RX}/RX1", "R", MUXA_SIG), ("10", f"GPIO{ESP_TX}/TX1", "R", MUXB_SIG),
+           ("9", f"GPIO{ESP_RX}/RX1", "R", ESP_RX_NET), ("10", f"GPIO{ESP_TX}/TX1", "R", ESP_TX_NET),
            ("11", f"GPIO{IR_PINS[0]}", "R", "IR1_DAT"), ("12", f"GPIO{IR_PINS[1]}", "R", "IR2_DAT"),
            ("13", "3V3", "R", "ESP_3V3"), ("14", "GND", "R", "GND")], 8.89)
 
 def mux_part(ref, value, sig_net, channel_net):
     """CD74HC4067 breakout. Both muxes share S0-S3, so one channel number selects the same PZEM on both."""
     pins = [("1", "SIG", "L", sig_net)] + [(str(2 + i), f"S{i}", "L", SEL_NET[i]) for i in range(4)]
-    pins += [("6", "EN", "L", "GND"), ("7", "VCC", "L", "ESP_3V3"), ("8", "GND", "L", "GND")]
+    pins += [("6", "EN", "L", "GND"), ("7", "VCC", "L", "USB_5V"), ("8", "GND", "L", "GND")]
     pins += [(str(9 + c), f"C{c}", "R", f"{channel_net}{c}" if c < N_PZEM else None) for c in range(16)]
     return Part(ref, value, "CD74HC4067_Module", pins, 7.62)
 
@@ -228,12 +230,19 @@ pzem_parts = []
 for ch in range(N_PZEM):
     label = "Main Panel" if ch == 0 else f"Branch {ch} (R{ch + 3})"
     pzem_parts.append(Part(f"U{8 + ch}", f"PZEM #{ch} {label}", "PZEM004T_v3_TTL",
-                           [("1", "5V", "L", "ESP_3V3"), ("2", "RX", "L", f"PZEM_RX_C{ch}"),
+                           [("1", "5V", "L", "USB_5V"), ("2", "RX", "L", f"PZEM_RX_C{ch}"),
                             ("3", "TX", "L", f"PZEM_TX_C{ch}"), ("4", "GND", "L", "GND")], 6.35,
-                           description="TTL side powered from ESP32 3V3"))
+                           description="TTL side powered from 5V (ESP32 VIN)"))
+
+U22 = Part("U22", "4-ch logic level converter (BSS138)", "Level_Converter_4ch",
+           [("1", "LV", "L", "ESP_3V3"), ("2", "LV1", "L", ESP_RX_NET), ("3", "LV2", "L", ESP_TX_NET),
+            ("4", "LV3", "L", None), ("5", "LV4", "L", None), ("6", "GND", "L", "GND"),
+            ("7", "HV", "R", "USB_5V"), ("8", "HV1", "R", MUXA_SIG), ("9", "HV2", "R", MUXB_SIG),
+            ("10", "HV3", "R", None), ("11", "HV4", "R", None), ("12", "GND", "R", "GND")], 7.62,
+           description="LV = 3.3V ESP32 side, HV = 5V mux/PZEM side")
 
 ir_parts = [Part(f"U{20 + k}", f"IR transmitter {k + 1} - {room}", "IR_TX_Module",
-                 [("1", "DAT", "L", f"IR{k + 1}_DAT"), ("2", "VCC", "L", "USB_VBUS"), ("3", "GND", "L", "GND")], 6.35,
+                 [("1", "DAT", "L", f"IR{k + 1}_DAT"), ("2", "VCC", "L", "USB_5V"), ("3", "GND", "L", "GND")], 6.35,
                  description="In the room, facing the aircon receiver")
             for k, room in enumerate(["Room 1 aircon (AUX)", "Room 2 aircon (Panasonic)"])]
 
@@ -252,6 +261,7 @@ PS1.place(232, 128, sheet_uuid, items, net_use)
 U6.place(42, 205, sheet_uuid, items, net_use)
 U7.place(118, 196, sheet_uuid, items, net_use)
 U19.place(118, 256, sheet_uuid, items, net_use)
+U22.place(70, 166, sheet_uuid, items, net_use)
 for k, p in enumerate(ir_parts):
     p.place(42, 248 + k * 22, sheet_uuid, items, net_use)
 for ch, p in enumerate(pzem_parts):
@@ -259,7 +269,7 @@ for ch, p in enumerate(pzem_parts):
     p.place(190 + col * 56, 168 + row * 32, sheet_uuid, items, net_use)
 
 text(items, 15, 16, ["RASPBERRY PI 5 DOMAIN  (relays, presence sensors, RTC)"], 1.8, True)
-text(items, 15, 150, ["ESP32 DOMAIN  (11x PZEM-004T via 2x CD74HC4067, 2x aircon IR, 3.3V logic)"], 1.8, True)
+text(items, 15, 150, ["ESP32 DOMAIN  (11x PZEM-004T via 2x CD74HC4067 at 5V, level converter, 2x aircon IR)"], 1.8, True)
 text(items, 300, 16, [
     "WIRING NOTES",
     "1. Same label name = same wire. Connect every pin that shares a label.",
@@ -277,13 +287,13 @@ text(items, 300, 16, [
     "7. Boot check: GPIO9-27 pull down at power-up, so relays",
     "   may click ON until app.py starts. Fix if needed:",
     "   config.txt: gpio=9-13,16-24,27=op,dh",
-    "8. ESP32 side is all 3.3V: PZEM TTL '5V' pins and mux",
-    "   VCC come from ESP32 3V3 (ESP_3V3). No level shifter.",
+    "8. PZEM TTL '5V' pins, both mux VCC and the IR modules",
+    "   run on 5V (ESP32 VIN = USB_5V). The ESP32 is 3.3V, so",
+    "   RX/TX pass through the level converter U22 (LV1/LV2).",
     "9. Two muxes, same S0-S3 wires: Mux A sends the selected",
     "   PZEM TX to ESP32 RX1, Mux B sends ESP32 TX1 to that",
     "   PZEM RX only. Channel Cn = PZEM #n on BOTH muxes.",
     "10. Both mux EN = GND (always on). C11-C15 unused.",
-    "    IR modules: VCC = ESP32 5V/VIN (USB_VBUS).",
     "11. Control wiring only: mains side not shown.",
 ], 1.27)
 
@@ -293,8 +303,8 @@ MUX_TABLE = [
     ("S1", f"ESP32 GPIO{MUX_SEL[1]}", f"ESP32 GPIO{MUX_SEL[1]}  (same wire)"),
     ("S2", f"ESP32 GPIO{MUX_SEL[2]}", f"ESP32 GPIO{MUX_SEL[2]}  (same wire)"),
     ("S3", f"ESP32 GPIO{MUX_SEL[3]}", f"ESP32 GPIO{MUX_SEL[3]}  (same wire)"),
-    ("SIG", f"ESP32 GPIO{ESP_RX} (RX1)", f"ESP32 GPIO{ESP_TX} (TX1)"),
-    ("VCC", "ESP32 3V3", "ESP32 3V3"),
+    ("SIG", f"U22 HV1 (GPIO{ESP_RX} RX)", f"U22 HV2 (GPIO{ESP_TX} TX)"),
+    ("VCC", "ESP32 5V (VIN)", "ESP32 5V (VIN)"),
     ("GND", "ESP32 GND", "ESP32 GND"),
     ("EN", "GND", "GND"),
     (f"C0-C{N_PZEM - 1}", f"TX of PZEM #0-#{N_PZEM - 1}", f"RX of PZEM #0-#{N_PZEM - 1}"),
@@ -314,9 +324,28 @@ text(items, TX0, TY0 + 6 + len(MUX_TABLE) * 2.54 + 3, [
     "  PZEM #n answers through Mux A.",
 ], 1.27)
 
+CONV_TABLE = [
+    ("U22 pin", "Connects to", "U22 pin", "Connects to"),
+    ("LV", "ESP32 3V3", "HV", "ESP32 5V (VIN)"),
+    ("LV1", f"ESP32 GPIO{ESP_RX} (RX)", "HV1", "Mux A SIG"),
+    ("LV2", f"ESP32 GPIO{ESP_TX} (TX)", "HV2", "Mux B SIG"),
+    ("LV3, LV4", "unused", "HV3, HV4", "unused"),
+    ("GND", "GND", "GND", "GND"),
+]
+CX0, CY0 = 165, 250
+text(items, CX0, CY0, ["LEVEL CONVERTER U22  (4-ch, LV = 3.3V side, HV = 5V side)"], 1.5, True)
+for col, cx in enumerate((CX0, CX0 + 16, CX0 + 50, CX0 + 66)):
+    text(items, cx, CY0 + 6, [row[col] for row in CONV_TABLE], 1.27, False)
+text(items, CX0, CY0 + 6 + len(CONV_TABLE) * 2.54 + 3, [
+    "- Only RX and TX need it: they carry the PZEM's 5V signals.",
+    "- S0-S3 go straight from the ESP32 (3.3V is read as HIGH by the",
+    "  74HC4067; it switches near half of VCC). If a PZEM ever reads",
+    "  the wrong channel, add a 2nd converter on S0-S3.",
+], 1.27)
+
 # --------------------------------------------------------------------------- write
 lib = "\n".join(p.lib_symbol() for p in
-                {type(p).__name__ + p.lib_name: p for p in [J1, J2, K1, PS1, U1, *hlk_parts, U6, U7, U19, *pzem_parts, *ir_parts]}.values())
+                {type(p).__name__ + p.lib_name: p for p in [J1, J2, K1, PS1, U1, *hlk_parts, U6, U7, U19, U22, *pzem_parts, *ir_parts]}.values())
 doc = f"""(kicad_sch
 (version 20250114)
 (generator "rems_generate_schematic")

@@ -224,6 +224,31 @@
 (pin passive line (at 10.16 -16.51 180) (length 2.54) (name "C14" (effects (font (size 1.27 1.27)))) (number "23" (effects (font (size 1.27 1.27)))))
 (pin passive line (at 10.16 -19.05 180) (length 2.54) (name "C15" (effects (font (size 1.27 1.27)))) (number "24" (effects (font (size 1.27 1.27)))))
 ))
+(symbol "Level_Converter_4ch"
+(pin_numbers (hide yes))
+(pin_names (offset 0.508))
+(exclude_from_sim yes) (in_bom yes) (on_board yes)
+(property "Reference" "U" (at 0 11.43 0) (effects (font (size 1.27 1.27))))
+(property "Value" "Level_Converter_4ch" (at 0 -11.43 0) (effects (font (size 1.27 1.27))))
+(property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(property "Description" "LV = 3.3V ESP32 side, HV = 5V mux/PZEM side" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(symbol "Level_Converter_4ch_0_1"
+(rectangle (start -7.62 8.89) (end 7.62 -8.89) (stroke (width 0.254) (type default)) (fill (type background))))
+(symbol "Level_Converter_4ch_1_1"
+(pin passive line (at -10.16 6.35 0) (length 2.54) (name "LV" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 3.81 0) (length 2.54) (name "LV1" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 1.27 0) (length 2.54) (name "LV2" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 -1.27 0) (length 2.54) (name "LV3" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 -3.81 0) (length 2.54) (name "LV4" (effects (font (size 1.27 1.27)))) (number "5" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 -6.35 0) (length 2.54) (name "GND" (effects (font (size 1.27 1.27)))) (number "6" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 6.35 180) (length 2.54) (name "HV" (effects (font (size 1.27 1.27)))) (number "7" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 3.81 180) (length 2.54) (name "HV1" (effects (font (size 1.27 1.27)))) (number "8" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 1.27 180) (length 2.54) (name "HV2" (effects (font (size 1.27 1.27)))) (number "9" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 -1.27 180) (length 2.54) (name "HV3" (effects (font (size 1.27 1.27)))) (number "10" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 -3.81 180) (length 2.54) (name "HV4" (effects (font (size 1.27 1.27)))) (number "11" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 -6.35 180) (length 2.54) (name "GND" (effects (font (size 1.27 1.27)))) (number "12" (effects (font (size 1.27 1.27)))))
+))
 (symbol "PZEM004T_v3_TTL"
 (pin_numbers (hide yes))
 (pin_names (offset 0.508))
@@ -232,7 +257,7 @@
 (property "Value" "PZEM004T_v3_TTL" (at 0 -8.89 0) (effects (font (size 1.27 1.27))))
 (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
 (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
-(property "Description" "TTL side powered from ESP32 3V3" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(property "Description" "TTL side powered from 5V (ESP32 VIN)" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
 (symbol "PZEM004T_v3_TTL_0_1"
 (rectangle (start -6.35 6.35) (end 6.35 -6.35) (stroke (width 0.254) (type default)) (fill (type background))))
 (symbol "PZEM004T_v3_TTL_1_1"

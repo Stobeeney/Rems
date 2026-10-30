@@ -36,15 +36,17 @@ IRac acUnit2(IR_PIN_UNIT2);
 // Two CD74HC4067 muxes share these select pins, so channel n = PZEM #n on both:
 //   Mux A: PZEM #n TX -> Cn, SIG -> ESP32 RX (GPIO19)
 //   Mux B: ESP32 TX (GPIO18) -> SIG, Cn -> PZEM #n RX
-// Both muxes: VCC -> 3V3, GND + EN -> GND.
+// Both muxes: VCC -> 5V (VIN), GND + EN -> GND. PZEM TTL side also runs on 5V.
+// RX/TX pass through a 4-ch logic level converter: GPIO19 <-> LV1/HV1 <-> Mux A SIG,
+// GPIO18 <-> LV2/HV2 <-> Mux B SIG (LV = 3V3, HV = 5V).
 #define PIN_S0 32
 #define PIN_S1 27
 #define PIN_S2 26
 #define PIN_S3 25
 
 // PZEM Serial Communication Pins (HardwareSerial 1)
-#define PZEM_RX_PIN 19 // ESP32 RX <- Mux A SIG <- selected PZEM TX
-#define PZEM_TX_PIN 18 // ESP32 TX -> Mux B SIG -> selected PZEM RX (3.3V logic)
+#define PZEM_RX_PIN 19 // ESP32 RX <- level converter <- Mux A SIG <- selected PZEM TX
+#define PZEM_TX_PIN 18 // ESP32 TX -> level converter -> Mux B SIG -> selected PZEM RX
 
 // 11 PZEMs: C0 (Main Panel) + C1 to C10 (10 Branches)
 #define TOTAL_PZEM_CHANNELS 11
