@@ -99,8 +99,12 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
+        // The screens live on the Pi, not in the APK. Drop any page cached from an older
+        // Pi build so a git pull on the Pi shows up on the phone the next time the app opens.
+        webView.clearCache(true);
+
         // Customize User Agent to ensure Flask serves the Mobile UI
-        String customUA = settings.getUserAgentString() + " REMSMobileApp/1.0 (Android)";
+        String customUA = settings.getUserAgentString() + " REMSMobileApp/2.1 (Android)";
         settings.setUserAgentString(customUA);
 
         // Long press gesture fallback to change URL anytime
