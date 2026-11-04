@@ -685,7 +685,7 @@ setInterval(async () => {
                 const b1 = data.relays['1'] === 'ON';
                 const b2 = data.relays['2'] === 'ON';
                 const b3 = data.relays['3'] === 'ON';
-                const acuOn = data.relays['7'] === 'ON';
+                const acuOn = !!(data.pfc && data.pfc.interlock_active);
 
                 const b1Badge = document.getElementById('pfc-bank1-badge');
                 const b2Badge = document.getElementById('pfc-bank2-badge');
@@ -840,7 +840,7 @@ window.turnOffAllNonCritical = async function() {
         const data = await res.json();
         if (data.success) {
             renderActiveDevicesPage();
-            alert(`Successfully disconnected ${data.count} non-critical load(s). Refrigerator (#10) and CCTV (#18) remain safely energized.`);
+            alert(`Successfully disconnected ${data.count} non-critical load(s). Branch 5 (critical) remains safely energized.`);
         }
     } catch (e) {
         alert("Error disconnecting non-critical loads: " + e);

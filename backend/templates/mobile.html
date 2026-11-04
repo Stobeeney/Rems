@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#0a0e17">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>REMCS Mobile - Energy Management</title>
+    <title>REMCS Mobile - Energy Management And Control</title>
     
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- PWA Manifest -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <!-- Mobile Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=4">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}?v=5">
 </head>
 <body>
 
@@ -125,9 +125,43 @@
                         <span class="m-status" id="mode-status-load">AUTO</span>
                     </div>
                 </div>
-                <div id="m-pfc-summary" style="margin-top: 8px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    <span style="color: var(--text-muted);">Capacitor Stage:</span>
-                    <strong id="m-pfc-stage" style="color: var(--primary);">Stage 0 (0 µF)</strong>
+            </div>
+
+            <!-- APFC Capacitor Banks (mirrors the tablet card) -->
+            <div class="m-card" style="margin-top: 12px;">
+                <div class="m-card-header">
+                    <span class="m-card-title"><i class="ph-fill ph-battery-charging"></i> PFC Capacitor Banks</span>
+                    <span class="pfc-pill safe" id="m-pfc-interlock">ACU SAFE</span>
+                </div>
+                <div class="pfc-metrics">
+                    <div><span>Required</span><strong id="m-pfc-required" class="amber">0.0 µF</strong></div>
+                    <div><span>Active</span><strong id="m-pfc-active">0 µF</strong></div>
+                    <div><span>PF</span><strong id="m-pfc-pf">--</strong></div>
+                </div>
+                <div class="pfc-stage-row">
+                    <span>Stage</span>
+                    <strong id="m-pfc-stage">Stage 0 (0 µF)</strong>
+                </div>
+                <div class="pfc-banks">
+                    <div class="pfc-bank" id="m-pfc-bank-1">
+                        <div class="pfc-bank-name">Bank 1 · 5 µF</div>
+                        <div class="pfc-bank-pin">SSR 1 (GPIO 17)</div>
+                        <span class="pfc-bank-state" id="m-pfc-bank-1-state">OFF</span>
+                    </div>
+                    <div class="pfc-bank" id="m-pfc-bank-2">
+                        <div class="pfc-bank-name">Bank 2 · 15 µF</div>
+                        <div class="pfc-bank-pin">SSR 2 (GPIO 27)</div>
+                        <span class="pfc-bank-state" id="m-pfc-bank-2-state">OFF</span>
+                    </div>
+                    <div class="pfc-bank" id="m-pfc-bank-3">
+                        <div class="pfc-bank-name">Bank 3 · 50 µF</div>
+                        <div class="pfc-bank-pin">SSR 3 (GPIO 22)</div>
+                        <span class="pfc-bank-state" id="m-pfc-bank-3-state">OFF</span>
+                    </div>
+                </div>
+                <div class="pfc-foot">
+                    <span>Target PF 0.97 · banks off while an aircon runs</span>
+                    <strong id="m-pfc-mode">APFC: AUTO</strong>
                 </div>
             </div>
         </section>
@@ -143,7 +177,7 @@
             </div>
         </section>
 
-        <!-- TAB 3: RELAY LOADS (20 Relays) -->
+        <!-- TAB 3: RELAY LOADS (8 SSR channels) -->
         <section class="tab-pane" id="tab-relays">
             <!-- Aircon IR Remote -->
             <div class="m-card" style="margin-bottom: 12px;">
@@ -170,7 +204,7 @@
                 <!-- Dynamically populated -->
             </div>
 
-            <!-- 20 Relays List -->
+            <!-- 8 SSR Relays List -->
             <div class="relay-list-grid" id="relay-cards-list">
                 <!-- Injected via mobile.js -->
             </div>
@@ -187,11 +221,11 @@
                 </p>
                 <div class="mode-toggle-bar">
                     <div class="mode-badge-btn active-auto" id="mode-btn-pfc-2" onclick="toggleMode('pfc')">
-                        <span class="m-label">PFC Relay Bank (K1-K3)</span>
+                        <span class="m-label">APFC Banks (5/15/50 µF)</span>
                         <span class="m-status" id="mode-status-pfc-2">AUTO</span>
                     </div>
                     <div class="mode-badge-btn active-auto" id="mode-btn-load-2" onclick="toggleMode('load')">
-                        <span class="m-label">20-Relay Load Shedding</span>
+                        <span class="m-label">8-SSR Load Shedding</span>
                         <span class="m-status" id="mode-status-load-2">AUTO</span>
                     </div>
                 </div>
@@ -282,6 +316,6 @@
     </div>
 
     <!-- Mobile Scripts -->
-    <script src="{{ url_for('static', filename='mobile.js') }}?v=5"></script>
+    <script src="{{ url_for('static', filename='mobile.js') }}?v=6"></script>
 </body>
 </html>

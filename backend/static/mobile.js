@@ -126,18 +126,8 @@ async function pollData() {
         const elFreq = document.getElementById('metric-freq-val');
         if (elFreq) elFreq.textContent = freq + " Hz";
 
-        // Update PFC Stage Telemetry
-        const elPfcStage = document.getElementById('m-pfc-stage');
-        if (elPfcStage && data.pfc) {
-            elPfcStage.textContent = `${data.pfc.stage_name || 'Stage 0'} (${data.pfc.status})`;
-            if (data.pfc.status === 'OPTIMAL') {
-                elPfcStage.style.color = 'var(--primary)';
-            } else if (data.pfc.status === 'CORRECTING') {
-                elPfcStage.style.color = 'var(--accent-amber)';
-            } else if (data.pfc.status === 'INTERLOCKED') {
-                elPfcStage.style.color = '#ef4444';
-            }
-        }
+        // APFC capacitor bank telemetry (same data the tablet card shows)
+        if (data.pfc) renderPfc(data.pfc, data.pfc_auto);
 
         // Update PZEM Branches
         if (data.branches) {
@@ -150,6 +140,43 @@ async function pollData() {
         }
     } catch (err) {
         setOnlineStatus(false);
+    }
+}
+
+// APFC Capacitor Banks card: required/active µF, stage, bank states, ACU interlock
+const PFC_STATUS_CLASS = { OPTIMAL: 'ok', CORRECTING: 'warn', INTERLOCKED: 'bad' };
+
+function renderPfc(pfc, autoOn) {
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const req = Number(pfc.required_uf);
+    setText('m-pfc-required', `${Number.isFinite(req) ? req.toFixed(1) : '0.0'} µF`);
+    setText('m-pfc-active', `${pfc.active_uf || 0} µF`);
+    if (pfc.current_pf !== undefined) setText('m-pfc-pf', Number(pfc.current_pf).toFixed(2));
+
+    const stage = document.getElementById('m-pfc-stage');
+    if (stage) {
+        stage.textContent = `${pfc.stage_name || 'Stage 0'} · ${pfc.status || 'IDLE'}`;
+        stage.className = PFC_STATUS_CLASS[pfc.status] || 'idle';
+    }
+
+    ['1', '2', '3'].forEach(id => {
+        const on = pfc.banks && pfc.banks[id] && pfc.banks[id].state === 'ON';
+        const card = document.getElementById(`m-pfc-bank-${id}`);
+        if (card) card.classList.toggle('on', on);
+        setText(`m-pfc-bank-${id}-state`, on ? 'ACTIVE' : 'OFF');
+    });
+
+    const lock = document.getElementById('m-pfc-interlock');
+    if (lock) {
+        lock.textContent = pfc.interlock_active ? 'INTERLOCKED (AC ON)' : 'ACU SAFE';
+        lock.className = `pfc-pill ${pfc.interlock_active ? 'locked' : 'safe'}`;
+    }
+
+    const mode = document.getElementById('m-pfc-mode');
+    if (mode) {
+        const auto = autoOn !== undefined ? autoOn : pfcMode === 'AUTO';
+        mode.textContent = auto ? (pfc.status === 'OPTIMAL' ? 'APFC: OPTIMAL (≥0.97)' : 'APFC: AUTO') : 'APFC: MANUAL';
+        mode.className = auto ? 'auto' : 'manual';
     }
 }
 
@@ -228,7 +255,7 @@ function updateSystemModeUI() {
 
 async function setSystemMode(mode) {
     if (mode === systemMode) return;
-    if (mode === 'SECURITY' && !confirm('Switch to SECURITY mode?\n\nAll non-critical loads will be turned OFF. Refrigerator and CCTV stay ON.')) return;
+    if (mode === 'SECURITY' && !confirm('Switch to SECURITY mode?\n\nAll non-critical loads will be turned OFF. Branch 5 (critical) stays ON.')) return;
     try {
         const res = await fetch('/api/mode', {
             method: 'POST',
@@ -515,9 +542,9 @@ async function setAllRelays(state) {
 
 // Emergency Cutoff
 async function emergencyCutoff() {
-    if (!confirm("⚠️ EMERGENCY CUTOFF: Turn OFF ALL 20 relays immediately?")) return;
+    if (!confirm("⚠️ EMERGENCY CUTOFF: Turn OFF ALL 8 SSR channels immediately?")) return;
     showToast("EMERGENCY CUTOFF TRIGGERED");
-    for (let i = 1; i <= 20; i++) {
+    for (let i = 1; i <= 8; i++) {
         await fetch('/api/relay', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
