@@ -18,6 +18,7 @@ import platform
 import secrets
 import shutil
 import urllib.request
+import math
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -27,20 +28,24 @@ if GEMINI_API_KEY:
 # =============================================================================
 # 1. Hardware Actuators: 20 Relays (Active Low)
 # =============================================================================
-# Relays 1-3: PFC Capacitor Banks (K1, K2, K3) via CJX2-1210 contactors
-# Relays 4-20: Monitored Lighting, Outlets, and ACU Load Branches
+# 8-Channel Solid State Relay (SSR) Configuration:
+# Relays 1-3: APFC Capacitor Banks (5 µF, 15 µF, 50 µF)
+# Relays 4-8: 5 Monitored Branch Circuits (Branches 1-5 / PZEM C1-C5)
+# Note: SSRs switch silently (no mechanical click). Check channel LEDs on board.
+# =============================================================================
 relay_pins = {
-    1: 17, 2: 27, 3: 22,   # PFC Capacitor Banks K1, K2, K3
-    4: 4,  5: 5,  6: 6,    # Living Room Lights, TV, Outlets Group 1
-    7: 7,  8: 8,  9: 9,    # ACU Main, Bedroom 1 Lights, Bedroom 1 Outlets
-    10: 10, 11: 11, 12: 12, # Refrigerator (Critical), Kitchen Outlets, Water Heater
-    13: 13, 14: 16, 15: 18, # Washing Machine, Microwave, Garage Door & Lights
-    16: 19, 17: 20, 18: 21, # Dining Room Lights, Outdoor Lights, CCTV/NVR (Critical)
-    19: 23, 20: 24          # Standby Outlets, Auxiliary Branch
+    1: 17,  # SSR 1: APFC Bank 1 (5 µF)
+    2: 27,  # SSR 2: APFC Bank 2 (15 µF)
+    3: 22,  # SSR 3: APFC Bank 3 (50 µF)
+    4: 4,   # SSR 4: Branch 1 (PZEM C1)
+    5: 5,   # SSR 5: Branch 2 (PZEM C2)
+    6: 6,   # SSR 6: Branch 3 (PZEM C3)
+    7: 7,   # SSR 7: Branch 4 (PZEM C4)
+    8: 8    # SSR 8: Branch 5 (PZEM C5)
 }
 relays = {}
 relay_status = {}
-pfc_auto_mode = False   # PFC automatic threshold engagement
+pfc_auto_mode = True    # PFC automatic threshold engagement (Default ON for APFC)
 load_auto_mode = False  # Load control automatic engagement
 system_mode = "MANUAL"  # 3 Modes: MANUAL, AI_ASSISTED, SECURITY
 
@@ -196,37 +201,28 @@ def init_db():
         c.execute("INSERT INTO users (username, password, role) VALUES ('user', 'password', 'user')")
         conn.commit()
 
+    # 8-Channel SSR Architecture Alignment: Prune any excess channels > 8
+    c.execute("DELETE FROM devices WHERE id > 8")
+    c.execute("UPDATE devices SET name = 'PFC Bank 1 (5 µF)' WHERE id = 1")
+    c.execute("UPDATE devices SET name = 'PFC Bank 2 (15 µF)' WHERE id = 2")
+    c.execute("UPDATE devices SET name = 'PFC Bank 3 (50 µF)' WHERE id = 3")
+    conn.commit()
+
     # Seed default devices only if devices table is empty
     c.execute("SELECT COUNT(*) FROM devices")
     if c.fetchone()[0] == 0:
         default_devices = [
-            (1, "PFC Capacitor Bank 1 (K1)", "Main Panel", "Pin 11 (GPIO 17)", 0.00),
-            (2, "PFC Capacitor Bank 2 (K2)", "Main Panel", "Pin 13 (GPIO 27)", 0.00),
-            (3, "PFC Capacitor Bank 3 (K3)", "Main Panel", "Pin 15 (GPIO 22)", 0.00),
-            (4, "Living Room Lights", "Living Room", "Pin 7 (GPIO 4)", 0.00),
-            (5, "Living Room TV", "Living Room", "Pin 29 (GPIO 5)", 0.00),
-            (6, "Outlet Group 1", "Living Room", "Pin 31 (GPIO 6)", 0.00),
-            (7, "Air Conditioner Main (ACU)", "Master Bedroom", "Pin 26 (GPIO 7)", 0.00),
-            (8, "Bedroom 1 Lights", "Master Bedroom", "Pin 24 (GPIO 8)", 0.00),
-            (9, "Bedroom 1 Outlet Group 2", "Master Bedroom", "Pin 21 (GPIO 9)", 0.00),
-            (10, "Refrigerator (Critical)", "Kitchen", "Pin 19 (GPIO 10)", 0.00),
-            (11, "Kitchen Outlets", "Kitchen", "Pin 23 (GPIO 11)", 0.00),
-            (12, "Water Heater", "Bathroom", "Pin 32 (GPIO 12)", 0.00),
-            (13, "Washing Machine", "Laundry Area", "Pin 33 (GPIO 13)", 0.00),
-            (14, "Microwave Oven", "Kitchen", "Pin 36 (GPIO 16)", 0.00),
-            (15, "Garage Door & Lights", "Garage", "Pin 12 (GPIO 18)", 0.00),
-            (16, "Dining Room Lighting", "Dining Room", "Pin 35 (GPIO 19)", 0.00),
-            (17, "Outdoor Security Lights", "Outdoor / Garden", "Pin 38 (GPIO 20)", 0.00),
-            (18, "CCTV / Security NVR", "Main Panel", "Pin 40 (GPIO 21)", 0.00),
-            (19, "Standby Outlets", "Living Room", "Pin 16 (GPIO 23)", 0.00),
-            (20, "Auxiliary Branch", "Main Panel", "Pin 18 (GPIO 24)", 0.00)
+            (1, "PFC Bank 1 (5 µF)", "Main Panel", "Pin 11 (GPIO 17)", 0.00),
+            (2, "PFC Bank 2 (15 µF)", "Main Panel", "Pin 13 (GPIO 27)", 0.00),
+            (3, "PFC Bank 3 (50 µF)", "Main Panel", "Pin 15 (GPIO 22)", 0.00),
+            (4, "Branch 1 (Living Room)", "Living Room", "Pin 7 (GPIO 4)", 0.00),
+            (5, "Branch 2 (Master Bedroom)", "Master Bedroom", "Pin 29 (GPIO 5)", 0.00),
+            (6, "Branch 3 (Kitchen)", "Kitchen", "Pin 31 (GPIO 6)", 0.00),
+            (7, "Branch 4 (Aircon / Outlets)", "Master Bedroom", "Pin 26 (GPIO 7)", 0.00),
+            (8, "Branch 5 (Dining / Critical)", "Dining Room", "Pin 24 (GPIO 8)", 0.00)
         ]
         c.executemany("INSERT INTO devices (id, name, room, pin_desc, power) VALUES (?, ?, ?, ?, ?)", default_devices)
         conn.commit()
-    # Undo an earlier build that used relay 20 for the Room 2 aircon (aircons are IR-only now)
-    c.execute("UPDATE devices SET name = 'Auxiliary Branch', room = 'Main Panel' "
-              "WHERE id = 20 AND name = 'Air Conditioner Bedroom 2 (ACU 2)'")
-    conn.commit()
     conn.close()
 
 # Initialize DB on startup
@@ -267,20 +263,22 @@ DEDICATED_ROOMS = [
 ]
 DEVICE_NAME_MAX_LEN = 40
 
-# Relay -> dedicated PZEM branch channel (None = no dedicated meter, only the C0 main panel sees it)
+# Relay -> dedicated PZEM branch channel (Relays 1-3 are APFC Banks monitored by C0 Main Panel)
 RELAY_CHANNEL_MAP = {
-    1: None, 2: None, 3: None,
-    4: "C1", 5: "C2", 6: "C3", 7: "C4", 8: "C5", 9: "C6", 10: "C7", 11: "C8", 12: "C9", 13: "C10",
-    14: None, 15: None, 16: None, 17: None, 18: None, 19: None, 20: None
+    1: None, 2: None, 3: None, # APFC Banks (monitored via C0 Main Line)
+    4: "C1",                    # SSR 4 -> Branch 1 (PZEM C1)
+    5: "C2",                    # SSR 5 -> Branch 2 (PZEM C2)
+    6: "C3",                    # SSR 6 -> Branch 3 (PZEM C3)
+    7: "C4",                    # SSR 7 -> Branch 4 (PZEM C4)
+    8: "C5"                     # SSR 8 -> Branch 5 (PZEM C5)
 }
 
 # =============================================================================
 # Electrical 3-Way Lighting (relay SPDT + wall SPDT switch, joined by travelers)
 # =============================================================================
 # Flipping either the relay or the wall switch toggles the lamp, so the relay
-# position is NOT the light state. Real state comes from the branch PZEM current;
-# lights without a dedicated PZEM fall back to the relay position (estimate).
-THREE_WAY_LIGHTS = {4, 8, 15, 16, 17}
+# position is NOT the light state. Real state comes from the branch PZEM current.
+THREE_WAY_LIGHTS = {4, 8}
 LIGHT_ON_CURRENT_A = 0.02   # Branch current above this means the lamp is lit
 PZEM_STALE_SECONDS = 30     # Older readings are not trusted for light sensing
 LIGHT_SETTLE_SECONDS = 4    # After a toggle, trust the expected state until PZEM catches up
@@ -977,14 +975,14 @@ def toggle_device_sensor_link():
         data = request.get_json() or {}
         dev_id = int(data.get('id', 0))
         linked = bool(data.get('linked', False))
-        if dev_id < 1 or dev_id > 20:
+        if dev_id < 1 or dev_id > 8:
             return jsonify({"success": False, "message": "Invalid device ID"}), 400
         
-        # Disallow linking PFC banks (Relays 1-3) and Critical Loads (10 Ref, 18 CCTV)
+        # Disallow linking PFC banks (Relays 1-3) and Critical Loads (Branch 5)
         if dev_id in [1, 2, 3]:
             return jsonify({"success": False, "message": "Cannot link PFC Capacitor Banks to motion sensor."}), 400
-        if dev_id in [10, 18]:
-            return jsonify({"success": False, "message": "Cannot link Critical Loads (Refrigerator/CCTV) to motion sensor."}), 400
+        if dev_id in [8]:
+            return jsonify({"success": False, "message": "Cannot link Critical Loads (Branch 5) to motion sensor."}), 400
 
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
@@ -1017,9 +1015,9 @@ def manage_system_mode():
             elif system_mode == 'SECURITY':
                 pfc_auto_mode = False
                 load_auto_mode = False
-                # Cut off non-critical convenience outlets; Keep critical (10=Ref, 18=CCTV) ON
-                for r_id in range(4, 21):
-                    if r_id not in [10, 18]:
+                # Cut off non-critical convenience outlets; Keep critical (8=Branch 5) ON
+                for r_id in range(4, 9):
+                    if r_id not in [8]:
                         set_load(r_id, False)
                 turn_off_aircons()
                 print("🔒 Switched to SECURITY MODE: Non-critical outlets cut off. Critical loads preserved.")
@@ -1061,10 +1059,10 @@ def get_active_devices():
 
 @app.route('/api/active-devices/turn-off-all', methods=['POST'])
 def turn_off_all_active_devices():
-    """Turns off all active non-critical loads (preserves Refrigerator #10, CCTV #18, and PFC Banks)"""
+    """Turns off all active non-critical loads (preserves Branch 5 and PFC Banks)"""
     turned_off = []
-    for r_id in range(4, 21):
-        if r_id not in [10, 18] and load_is_on(r_id):
+    for r_id in range(4, 9):
+        if r_id not in [8] and load_is_on(r_id):
             set_load(r_id, False)
             turned_off.append(r_id)
     for u, st in aircon_state.items():
@@ -1126,6 +1124,7 @@ def send_data_to_frontend():
     resp["relays"] = relays_snapshot()
     resp["lights"] = lights_snapshot()
     resp["aircons"] = aircons_snapshot()
+    resp["pfc"] = pfc_telemetry
     return jsonify(resp), 200
 
 
@@ -1401,8 +1400,8 @@ def safety_monitoring_engine():
                 else:
                     overcurrent_timers.pop(ch_key, None)
 
-            # 2. Actuator Fault Detection (Relay commanded OFF but current persists)
-            for r_id in range(4, 21):
+            # 2. Actuator Fault Detection (SSR commanded OFF but current persists)
+            for r_id in range(4, 9):
                 ch_key = RELAY_CHANNEL_MAP.get(r_id)
                 # Skip unmetered relays and 3-way lights (the wall switch can power them with the relay "OFF")
                 if ch_key and r_id not in THREE_WAY_LIGHTS and not relay_status.get(r_id, False):
@@ -1616,45 +1615,213 @@ def occupancy_engine():
         time.sleep(0.3)
 
 
+# =============================================================================
+# Automated Power Factor Correction (APFC) Decision Matrix Engine
+# =============================================================================
+# Automated Power Factor Correction (APFC) Decision Matrix Engine
+# Revised Stages: 3 Banks (5 µF, 15 µF, 50 µF)
+# 5-14 µF: Cap 1 (5 µF)
+# 15-19 µF: Cap 2 (15 µF)
+# 20-49 µF: Cap 1 + Cap 2 (20 µF)
+# 50-64 µF: Cap 1 + Cap 3 (55 µF)
+# 65-69 µF: Cap 2 + Cap 3 (65 µF)
+# 70+ µF: Cap 1 + Cap 2 + Cap 3 (70 µF)
+# =============================================================================
+PFC_STAGES = [
+    {"stage": 0, "uf": 0,  "name": "Stage 0 (0 µF)",  "banks": {1: False, 2: False, 3: False}},
+    {"stage": 1, "uf": 5,  "name": "Stage 1 (5 µF)",  "banks": {1: True,  2: False, 3: False}},
+    {"stage": 2, "uf": 15, "name": "Stage 2 (15 µF)", "banks": {1: False, 2: True,  3: False}},
+    {"stage": 3, "uf": 20, "name": "Stage 3 (20 µF)", "banks": {1: True,  2: True,  3: False}},
+    {"stage": 4, "uf": 55, "name": "Stage 4 (55 µF)", "banks": {1: True,  2: False, 3: True}},
+    {"stage": 5, "uf": 65, "name": "Stage 5 (65 µF)", "banks": {1: False, 2: True,  3: True}},
+    {"stage": 6, "uf": 70, "name": "Stage 6 (70 µF)", "banks": {1: True,  2: True,  3: True}}
+]
+
+pfc_telemetry = {
+    "status": "IDLE",
+    "target_pf": 0.97,
+    "current_pf": 1.0,
+    "qc_var": 0.0,
+    "required_uf": 0.0,
+    "active_uf": 0,
+    "stage": 0,
+    "stage_name": "Stage 0 (0 µF)",
+    "interlock_active": False,
+    "banks": {
+        "1": {"capacity_uf": 5, "state": "OFF"},
+        "2": {"capacity_uf": 15, "state": "OFF"},
+        "3": {"capacity_uf": 50, "state": "OFF"}
+    }
+}
+
+def calculate_pfc_matrix_stage(voltage, current, power, pf, freq=60.0, target_pf=0.97):
+    """
+    Computes required reactive compensation (VAR and µF) to bring power factor to target_pf (0.97).
+    Directly aligns with thesis load profiling matrix in MATRIX-APFC.pdf:
+    - If PF >= 0.97 or load is idle: Stage 0 (0 µF, All OFF)
+    - If PF < 0.97: Calculates exact Farads from active power & Amps, mapping to closest combination stage.
+    """
+    if voltage < 50.0 or current < 0.15 or power < 20.0:
+        return {
+            "status": "IDLE",
+            "required_uf": 0.0,
+            "qc_var": 0.0,
+            "stage": 0,
+            "stage_name": "Stage 0 (0 µF - Idle)",
+            "active_uf": 0,
+            "banks": {1: False, 2: False, 3: False}
+        }
+    
+    # 1. CORE THESIS RULE: If measured PF >= 0.97, NO switching occurs.
+    if pf >= target_pf or pf <= 0.05:
+        return {
+            "status": "OPTIMAL",
+            "required_uf": 0.0,
+            "qc_var": 0.0,
+            "stage": 0,
+            "stage_name": "Stage 0 (0 µF - Optimal PF)",
+            "active_uf": 0,
+            "banks": {1: False, 2: False, 3: False}
+        }
+
+    # 2. Physics & Reactive Power Calculation
+    tan_theta1 = math.sqrt(max(0.0, 1.0 - (pf * pf))) / pf
+    tan_theta2 = math.sqrt(max(0.0, 1.0 - (target_pf * target_pf))) / target_pf # ~0.25064
+
+    delta_tan = max(0.0, tan_theta1 - tan_theta2)
+    qc_var = power * delta_tan
+
+    omega = 2.0 * math.pi * (freq if freq > 40.0 else 60.0)
+    denom = omega * (voltage * voltage)
+    required_uf = (qc_var / denom) * 1e6 if denom > 0 else 0.0
+
+    # 3. Decision Matrix Stage Mapping (Exact user-specified ranges)
+    # < 5 µF: Stage 0 (0 µF, All OFF)
+    # 5 - 14 µF: Stage 1 (Cap 1: 5 µF)
+    # 15 - 19 µF: Stage 2 (Cap 2: 15 µF)
+    # 20 - 49 µF: Stage 3 (Cap 1 + Cap 2: 20 µF)
+    # 50 - 64 µF: Stage 4 (Cap 1 + Cap 3: 55 µF)
+    # 65 - 69 µF: Stage 5 (Cap 2 + Cap 3: 65 µF)
+    # >= 70 µF: Stage 6 (Cap 1 + Cap 2 + Cap 3: 70 µF)
+    if required_uf < 5.0:
+        chosen_stage = 0
+    elif required_uf < 15.0:
+        chosen_stage = 1
+    elif required_uf < 20.0:
+        chosen_stage = 2
+    elif required_uf < 50.0:
+        chosen_stage = 3
+    elif required_uf < 65.0:
+        chosen_stage = 4
+    elif required_uf < 70.0:
+        chosen_stage = 5
+    else:
+        chosen_stage = 6
+
+    st = PFC_STAGES[chosen_stage]
+    return {
+        "status": "CORRECTING",
+        "required_uf": round(required_uf, 2),
+        "qc_var": round(qc_var, 1),
+        "stage": st["stage"],
+        "stage_name": st["name"],
+        "active_uf": st["uf"],
+        "banks": st["banks"]
+    }
+
 def pfc_automation_engine():
-    """Automated Power Factor Correction (PFC) loop for Relays 1, 2, 3 and Contactors K1, K2, K3"""
+    """Automated Power Factor Correction (PFC) loop with physics calculation, 8-stage matrix, and ACU interlock"""
+    global pfc_telemetry
+    last_switch_time = 0.0
+    HYSTERESIS_SECONDS = 5.0 # Protect CJX2-1210 contactors against rapid chattering
+    current_active_stage = 0
+
     while True:
         try:
+            acu_on = any_acu_on()
+            
+            # ACU Interlock Safety Check
+            if acu_on:
+                for r_id in [1, 2, 3]:
+                    if relay_status.get(r_id, False) and relays.get(r_id):
+                        relays[r_id].off()
+                        relay_status[r_id] = False
+                current_active_stage = 0
+                pfc_telemetry = {
+                    "status": "INTERLOCKED",
+                    "target_pf": 0.97,
+                    "current_pf": round(latest_sensor_data.get("power_factor", 1.0), 2),
+                    "qc_var": 0.0,
+                    "required_uf": 0.0,
+                    "active_uf": 0,
+                    "stage": 0,
+                    "stage_name": "Stage 0 (0 µF - ACU Interlock)",
+                    "interlock_active": True,
+                    "banks": {
+                        "1": {"capacity_uf": 5, "state": "OFF"},
+                        "2": {"capacity_uf": 15, "state": "OFF"},
+                        "3": {"capacity_uf": 50, "state": "OFF"}
+                    }
+                }
+                time.sleep(2)
+                continue
+
+            # Read live metrics from Main Panel C0
+            main_v = latest_sensor_data.get("voltage", 0.0)
+            main_i = latest_sensor_data.get("current", 0.0)
+            main_p = latest_sensor_data.get("power", 0.0)
+            main_pf = latest_sensor_data.get("power_factor", 1.0)
+            main_f = latest_sensor_data.get("frequency", 60.0)
+
+            # Compute needed reactive compensation and stage
+            pfc_res = calculate_pfc_matrix_stage(main_v, main_i, main_p, main_pf, main_f, target_pf=0.97)
+
+            # If AUTO mode or AI_ASSISTED mode is active, switch physical relays
             if pfc_auto_mode or system_mode == 'AI_ASSISTED':
-                # Interlock Check: If any aircon is active/starting, turn OFF capacitor banks
-                acu_on = any_acu_on()
-                if acu_on:
-                    for r_id in [1, 2, 3]:
-                        if relay_status.get(r_id, False) and relays.get(r_id):
-                            relays[r_id].off()
-                            relay_status[r_id] = False
-                            print(f"⚡ [PFC Interlock]: ACU is ON. Disengaged Capacitor Bank Relay {r_id}.")
-                else:
-                    main_p = latest_sensor_data.get("power", 0.0)
-                    main_pf = latest_sensor_data.get("power_factor", 1.0)
-                    
-                    # Compensate only when load is actively drawing power (> 50W) and PF is lagging
-                    if main_p > 50.0 and 0.1 < main_pf < 0.97:
-                        if main_pf < 0.85:
-                            if not relay_status.get(1, False) and relays.get(1):
-                                relays[1].on(); relay_status[1] = True
-                            if not relay_status.get(2, False) and relays.get(2):
-                                relays[2].on(); relay_status[2] = True
-                            print(f"⚡ [PFC Auto]: Low PF ({main_pf:.2f}). Engaged Capacitor Banks 1 & 2.")
-                        else:
-                            if not relay_status.get(1, False) and relays.get(1):
-                                relays[1].on(); relay_status[1] = True
-                            print(f"⚡ [PFC Auto]: Lagging PF ({main_pf:.2f}). Engaged Capacitor Bank 1.")
-                    elif main_pf >= 0.97 or main_p < 25.0:
-                        # De-energize to avoid leading PF / overcompensation
-                        for r_id in [1, 2, 3]:
-                            if relay_status.get(r_id, False) and relays.get(r_id):
-                                relays[r_id].off()
-                                relay_status[r_id] = False
-                                print(f"⚡ [PFC Auto]: Optimal PF ({main_pf:.2f}) or idle load. Disengaged Bank {r_id}.")
-        except Exception:
-            pass
-        time.sleep(2)
+                target_stage = pfc_res["stage"]
+                now = time.time()
+
+                if target_stage != current_active_stage:
+                    if (now - last_switch_time) >= HYSTERESIS_SECONDS:
+                        banks = pfc_res["banks"]
+                        for r_id, should_be_on in banks.items():
+                            if relays.get(r_id):
+                                if should_be_on and not relay_status.get(r_id, False):
+                                    relays[r_id].on()
+                                    relay_status[r_id] = True
+                                elif not should_be_on and relay_status.get(r_id, False):
+                                    relays[r_id].off()
+                                    relay_status[r_id] = False
+                        current_active_stage = target_stage
+                        last_switch_time = now
+                        print(f"⚡ [PFC Matrix]: Engaged {pfc_res['stage_name']} (Req: {pfc_res['required_uf']} µF, PF: {main_pf:.2f} -> 0.97)")
+
+            # Update live telemetry snapshot
+            active_uf = sum([
+                5 if relay_status.get(1, False) else 0,
+                15 if relay_status.get(2, False) else 0,
+                50 if relay_status.get(3, False) else 0
+            ])
+            pfc_telemetry = {
+                "status": pfc_res["status"],
+                "target_pf": 0.97,
+                "current_pf": round(main_pf, 2),
+                "qc_var": pfc_res["qc_var"],
+                "required_uf": pfc_res["required_uf"],
+                "active_uf": active_uf,
+                "stage": current_active_stage,
+                "stage_name": pfc_res["stage_name"],
+                "interlock_active": False,
+                "banks": {
+                    "1": {"capacity_uf": 5, "state": "ON" if relay_status.get(1, False) else "OFF"},
+                    "2": {"capacity_uf": 15, "state": "ON" if relay_status.get(2, False) else "OFF"},
+                    "3": {"capacity_uf": 50, "state": "ON" if relay_status.get(3, False) else "OFF"}
+                }
+            }
+
+        except Exception as e:
+            print(f"⚠️ Error in PFC automation engine: {e}")
+        time.sleep(1.5)
 
 
 def periodic_energy_logger():

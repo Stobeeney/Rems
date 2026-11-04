@@ -28,11 +28,15 @@ const float AC_SET_TEMP_C = 24.0;   // starting temperature until the app sends 
 IRac acUnit1(IR_PIN_UNIT1);
 IRac acUnit2(IR_PIN_UNIT2);
 
-// Multiplexer Address Select Pins
-#define PIN_S0 25
-#define PIN_S1 26
-#define PIN_S2 27
-#define PIN_S3 32
+// Multiplexer Address Select Pins (Matched to SparkFun CD74HC4067 pin order S3..S0)
+// ESP32 GPIO 32 -> MUX S0 (Pin 7)
+// ESP32 GPIO 27 -> MUX S1 (Pin 6)
+// ESP32 GPIO 26 -> MUX S2 (Pin 5)
+// ESP32 GPIO 25 -> MUX S3 (Pin 4)
+#define PIN_S0 32
+#define PIN_S1 27
+#define PIN_S2 26
+#define PIN_S3 25
 
 // PZEM Serial Communication Pins (HardwareSerial 1)
 #define PZEM_RX_PIN 19 // ESP32 RX <- MUX SIG <- PZEM TX
@@ -152,6 +156,9 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
+    // Initialize PZEM HardwareSerial on GPIO 19 (RX) and GPIO 18 (TX)
+    PzemSerial.begin(9600, SERIAL_8N1, PZEM_RX_PIN, PZEM_TX_PIN);
+
     setupAircon(acUnit1, AC_PROTOCOL_UNIT1, AC_MODEL_UNIT1);
     setupAircon(acUnit2, AC_PROTOCOL_UNIT2, AC_MODEL_UNIT2);
 
@@ -209,8 +216,10 @@ void loop() {
             Serial.println(",\"status\":\"STANDBY\",\"voltage\":0.0,\"current\":0.0,\"power\":0.0,\"pf\":0.0,\"freq\":0.0,\"energy\":0.0}");
         }
 
-        delayPolling(35);
+        // PZEM004Tv30 library caches readings for 200ms (UPDATE_TIME).
+        // Delaying 215ms forces a fresh Modbus query for each multiplexer channel.
+        delayPolling(215);
     }
 
-    delayPolling(400);
+    delayPolling(200);
 }

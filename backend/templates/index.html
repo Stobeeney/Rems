@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>REMS - Residential Energy Management System</title>
+    <title>REMCS - Residential Energy Management And Control System</title>
     <link rel="stylesheet" href="/static/styles_v4.css?v=31">
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -19,8 +19,8 @@
                     <i class="ph-fill ph-house"></i>
                     <i class="ph-fill ph-lightning bolt-icon"></i>
                 </div>
-                <h2 id="login-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Welcome to REMS</h2>
-                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Development of an AI-Assisted Residential Energy<br>Management System</p>
+                <h2 id="login-title" style="font-size: 18px; font-weight: 800; color: #ffffff;">Welcome to REMCS</h2>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Development of an AI-Assisted Residential Energy<br>Management And Control System</p>
             </div>
             <!-- Sign In Form -->
             <form id="login-form" class="login-form">
@@ -73,8 +73,8 @@
                         <i class="ph-fill ph-lightning"></i>
                     </div>
                     <div>
-                        <h1>REMS</h1>
-                        <p>Development of an AI-Assisted Residential Energy<br>Management System</p>
+                        <h1>REMCS</h1>
+                        <p>Development of an AI-Assisted Residential Energy<br>Management And Control System</p>
                     </div>
                 </div>
 
@@ -130,8 +130,8 @@
                     <strong id="pi-ip-address">—</strong>
                 </div>
                 <div class="datetime">
-                    <span id="current-date">August 06, 2026</span>
-                    <span id="current-time">5:25 pm EST</span>
+                    <span id="current-date">--</span>
+                    <span id="current-time">--:--:--</span>
                 </div>
             </div>
         </aside>
@@ -277,27 +277,44 @@
 
                 <!-- Card C: PFC Capacitor Banks & ACU Interlock -->
                 <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
-                    <div class="card-header" style="margin-bottom: 6px;">
-                        <h3>PFC CAPACITOR BANKS</h3>
+                    <div class="card-header" style="margin-bottom: 4px;">
+                        <h3 style="font-size: 13px;">PFC CAPACITOR BANKS</h3>
                         <span class="badge-pill" id="pfc-interlock-badge" style="background: rgba(34,197,94,0.15); color: #4ade80; font-size: 10px;">ACU SAFE</span>
                     </div>
-                    <div style="display: flex; gap: 6px; justify-content: space-between; margin-top: 4px;">
-                        <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px;">
-                            <div style="font-size: 10px; color: var(--text-muted);">Bank 1 (K1)</div>
-                            <span class="badge-pill" id="pfc-bank1-badge" style="font-size: 10px; margin-top: 4px; display: inline-block;">OFF</span>
+
+                    <!-- Live AI APFC Metrics Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; margin: 2px 0 6px 0; font-size: 10px;">
+                        <div>
+                            <span style="color: var(--text-muted);">Required: </span>
+                            <strong id="pfc-required-uf" style="color: var(--accent-yellow); font-family: monospace;">0.0 µF</strong>
                         </div>
-                        <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px;">
-                            <div style="font-size: 10px; color: var(--text-muted);">Bank 2 (K2)</div>
-                            <span class="badge-pill" id="pfc-bank2-badge" style="font-size: 10px; margin-top: 4px; display: inline-block;">OFF</span>
+                        <div>
+                            <span style="color: var(--text-muted);">Active: </span>
+                            <strong id="pfc-active-uf" style="color: var(--primary); font-family: monospace;">0 µF</strong>
                         </div>
-                        <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px;">
-                            <div style="font-size: 10px; color: var(--text-muted);">Bank 3 (K3)</div>
-                            <span class="badge-pill" id="pfc-bank3-badge" style="font-size: 10px; margin-top: 4px; display: inline-block;">OFF</span>
+                        <span class="badge-pill" id="pfc-stage-badge" style="font-size: 9px; padding: 2px 6px; background: rgba(59,130,246,0.2); color: #93c5fd; font-weight: 700;">Stage 0 (0 µF)</span>
+                    </div>
+
+                    <div style="display: flex; gap: 6px; justify-content: space-between;">
+                        <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px;">
+                            <div style="font-size: 10px; color: #ffffff; font-weight: 600;">Bank 1 (5 µF)</div>
+                            <div style="font-size: 9px; color: var(--text-muted);">SSR 1 (GPIO 17)</div>
+                            <span class="badge-pill" id="pfc-bank1-badge" style="font-size: 9px; margin-top: 3px; display: inline-block;">OFF</span>
+                        </div>
+                        <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px;">
+                            <div style="font-size: 10px; color: #ffffff; font-weight: 600;">Bank 2 (15 µF)</div>
+                            <div style="font-size: 9px; color: var(--text-muted);">SSR 2 (GPIO 27)</div>
+                            <span class="badge-pill" id="pfc-bank2-badge" style="font-size: 9px; margin-top: 3px; display: inline-block;">OFF</span>
+                        </div>
+                        <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px;">
+                            <div style="font-size: 10px; color: #ffffff; font-weight: 600;">Bank 3 (50 µF)</div>
+                            <div style="font-size: 9px; color: var(--text-muted);">SSR 3 (GPIO 22)</div>
+                            <span class="badge-pill" id="pfc-bank3-badge" style="font-size: 9px; margin-top: 3px; display: inline-block;">OFF</span>
                         </div>
                     </div>
-                    <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;">
+                    <div style="margin-top: 6px; font-size: 10px; color: var(--text-muted); display: flex; justify-content: space-between;">
                         <span>Interlock: Relay 7 (ACU)</span>
-                        <span id="pfc-mode-text">PFC: AUTO</span>
+                        <span id="pfc-mode-text" style="color: var(--primary); font-weight: 700;">APFC: AUTO (0.97 Target)</span>
                     </div>
                 </div>
             </div>
@@ -739,7 +756,7 @@
                 <!-- Left: Devices List Table -->
                 <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
                     <div style="padding: 16px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="font-size: 12px; font-weight: 700; color: var(--text-muted);">DEVICES (20 CHANNELS)</h3>
+                        <h3 style="font-size: 12px; font-weight: 700; color: var(--text-muted);">DEVICES (8 SSR CHANNELS)</h3>
                         <span class="badge-pill badge-info" id="lc-mode-indicator">Mode: AUTO</span>
                     </div>
 
@@ -757,7 +774,7 @@
                                 </tr>
                             </thead>
                             <tbody id="load-control-table-body">
-                                <!-- Populated dynamically with all 20 relays -->
+                                <!-- Populated dynamically with 8 SSR relays -->
                             </tbody>
                         </table>
                     </div>
@@ -770,7 +787,7 @@
                         </div>
                         <div>
                             <div style="color: var(--text-muted);">Total Devices</div>
-                            <div style="font-weight: 800; font-size: 14px; color: #ffffff;">20</div>
+                            <div style="font-weight: 800; font-size: 14px; color: #ffffff;">8</div>
                         </div>
                         <div>
                             <div style="color: var(--text-muted);">Devices ON</div>
@@ -988,7 +1005,7 @@
                     </div>
                     <div class="form-group">
                         <label>System Name</label>
-                        <input type="text" class="form-control" value="REMS" readonly>
+                        <input type="text" class="form-control" value="REMCS" readonly>
                     </div>
                     <div class="form-group">
                         <label>Location</label>
@@ -1057,7 +1074,7 @@
     <!-- 7. ABOUT SYSTEM TEMPLATE -->
     <template id="tpl-about">
         <div class="card" style="padding: 24px;">
-            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">REMS - Development of an AI-Assisted Residential Energy Management System</h2>
+            <h2 style="font-size: 18px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">REMCS - Development of an AI-Assisted Residential Energy Management And Control System</h2>
             <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px; line-height: 1.6;">
                 Developed for academic engineering thesis compliance featuring real-time multi-branch electrical telemetry, automated power factor correction, mmWave human presence adaptive load control, comprehensive safety interlocking, and AI-driven energy conservation recommendations.
             </p>

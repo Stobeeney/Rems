@@ -1,5 +1,5 @@
 // =============================================================================
-// REMS - Residential Energy Management Control System
+// REMCS - Residential Energy Management And Control System
 // Comprehensive Frontend Controller (app.js v10)
 // =============================================================================
 
@@ -110,28 +110,16 @@ const DEDICATED_ROOMS = [
     "Main Panel"
 ];
 
-// Global Relay Device List for Load Control (20 Relays - Customizable)
+// Global Relay Device List for Load Control (8 SSR Relays: 3 APFC + 5 Branches)
 let DEVICE_MAPPING = [
-    { id: 1, name: "PFC Capacitor Bank 1 (K1)", room: "Main Panel", pin: "Pin 11 (GPIO 17)", power: 0.00 },
-    { id: 2, name: "PFC Capacitor Bank 2 (K2)", room: "Main Panel", pin: "Pin 13 (GPIO 27)", power: 0.00 },
-    { id: 3, name: "PFC Capacitor Bank 3 (K3)", room: "Main Panel", pin: "Pin 15 (GPIO 22)", power: 0.00 },
-    { id: 4, name: "Living Room Lights", room: "Living Room", pin: "Pin 7 (GPIO 4)", power: 0.00, three_way: true },
-    { id: 5, name: "Living Room TV", room: "Living Room", pin: "Pin 29 (GPIO 5)", power: 0.00 },
-    { id: 6, name: "Outlet Group 1", room: "Living Room", pin: "Pin 31 (GPIO 6)", power: 0.00 },
-    { id: 7, name: "Air Conditioner Main (ACU)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00 },
-    { id: 8, name: "Bedroom 1 Lights", room: "Master Bedroom", pin: "Pin 24 (GPIO 8)", power: 0.00, three_way: true },
-    { id: 9, name: "Bedroom 1 Outlet Group 2", room: "Master Bedroom", pin: "Pin 21 (GPIO 9)", power: 0.00 },
-    { id: 10, name: "Refrigerator (Critical)", room: "Kitchen", pin: "Pin 19 (GPIO 10)", power: 0.00 },
-    { id: 11, name: "Kitchen Outlets", room: "Kitchen", pin: "Pin 23 (GPIO 11)", power: 0.00 },
-    { id: 12, name: "Water Heater", room: "Bathroom", pin: "Pin 32 (GPIO 12)", power: 0.00 },
-    { id: 13, name: "Washing Machine", room: "Laundry Area", pin: "Pin 33 (GPIO 13)", power: 0.00 },
-    { id: 14, name: "Microwave Oven", room: "Kitchen", pin: "Pin 36 (GPIO 16)", power: 0.00 },
-    { id: 15, name: "Garage Door & Lights", room: "Garage", pin: "Pin 12 (GPIO 18)", power: 0.00, three_way: true },
-    { id: 16, name: "Dining Room Lighting", room: "Dining Room", pin: "Pin 35 (GPIO 19)", power: 0.00, three_way: true },
-    { id: 17, name: "Outdoor Security Lights", room: "Outdoor / Garden", pin: "Pin 38 (GPIO 20)", power: 0.00, three_way: true },
-    { id: 18, name: "CCTV / Security NVR", room: "Main Panel", pin: "Pin 40 (GPIO 21)", power: 0.00 },
-    { id: 19, name: "Standby Outlets", room: "Living Room", pin: "Pin 16 (GPIO 23)", power: 0.00 },
-    { id: 20, name: "Auxiliary Branch", room: "Main Panel", pin: "Pin 18 (GPIO 24)", power: 0.00 }
+    { id: 1, name: "PFC Capacitor Bank 1 (5 µF)", room: "Main Panel", pin: "Pin 11 (GPIO 17)", power: 0.00 },
+    { id: 2, name: "PFC Capacitor Bank 2 (15 µF)", room: "Main Panel", pin: "Pin 13 (GPIO 27)", power: 0.00 },
+    { id: 3, name: "PFC Capacitor Bank 3 (50 µF)", room: "Main Panel", pin: "Pin 15 (GPIO 22)", power: 0.00 },
+    { id: 4, name: "Branch 1 (Living Room)", room: "Living Room", pin: "Pin 7 (GPIO 4)", power: 0.00, three_way: true },
+    { id: 5, name: "Branch 2 (Master Bedroom)", room: "Master Bedroom", pin: "Pin 29 (GPIO 5)", power: 0.00 },
+    { id: 6, name: "Branch 3 (Kitchen)", room: "Kitchen", pin: "Pin 31 (GPIO 6)", power: 0.00 },
+    { id: 7, name: "Branch 4 (Aircon / Outlets)", room: "Master Bedroom", pin: "Pin 26 (GPIO 7)", power: 0.00 },
+    { id: 8, name: "Branch 5 (Dining / Critical)", room: "Dining Room", pin: "Pin 24 (GPIO 8)", power: 0.00, three_way: true }
 ];
 
 let currentRelayStates = {};
@@ -183,7 +171,7 @@ function initLoadControlTable() {
     tbody.innerHTML = '';
     DEVICE_MAPPING.forEach(dev => {
         const isChecked = effectiveRelayState(dev.id, currentRelayStates, currentLightStates) === 'ON';
-        const isProtected = [1, 2, 3, 10, 18].includes(dev.id);
+        const isProtected = [1, 2, 3].includes(dev.id);
         const roomOptionsHtml = DEDICATED_ROOMS.map(r => 
             `<option value="${escapeHtml(r)}" ${dev.room === r ? 'selected' : ''}>${escapeHtml(r)}</option>`
         ).join('');
@@ -502,6 +490,7 @@ setInterval(async () => {
             const pfEl = document.getElementById('val-power-factor');
             const totalPEl = document.getElementById('val-total-power');
             const gVal = document.getElementById('gauge-power-factor');
+            const freqEl = document.getElementById('val-frequency');
             
             const kw = data.power > 100 ? (data.power / 1000).toFixed(2) : data.power.toFixed(2);
             if (vEl) vEl.textContent = `${parseFloat(data.voltage).toFixed(1)} V`;
@@ -510,6 +499,7 @@ setInterval(async () => {
             if (totalPEl) totalPEl.textContent = `${kw} kW`;
             if (pfEl) pfEl.textContent = parseFloat(data.power_factor).toFixed(2);
             if (gVal) gVal.textContent = parseFloat(data.power_factor).toFixed(2);
+            if (freqEl && data.frequency !== undefined) freqEl.textContent = `${parseFloat(data.frequency).toFixed(1)} Hz`;
             
             // Helper to extract branch metrics based on user dropdown selection
             function getBranchMetric(metric, fallbackVal) {
@@ -654,7 +644,43 @@ setInterval(async () => {
                     }
                 }
 
-            // PFC Capacitor Bank Status & ACU Interlock
+            // PFC Capacitor Bank Status & AI Multistage APFC Telemetry
+            if (data.pfc) {
+                const pfc = data.pfc;
+                const reqEl = document.getElementById('pfc-required-uf');
+                const actEl = document.getElementById('pfc-active-uf');
+                const stageEl = document.getElementById('pfc-stage-badge');
+                const modeText = document.getElementById('pfc-mode-text');
+
+                if (reqEl) reqEl.textContent = `${pfc.required_uf !== undefined ? pfc.required_uf.toFixed(1) : '0.0'} µF`;
+                if (actEl) actEl.textContent = `${pfc.active_uf || 0} µF`;
+                if (stageEl) {
+                    stageEl.textContent = pfc.stage_name || `Stage ${pfc.stage || 0}`;
+                    if (pfc.status === 'OPTIMAL') {
+                        stageEl.style.background = 'rgba(34, 197, 94, 0.2)';
+                        stageEl.style.color = '#86efac';
+                    } else if (pfc.status === 'CORRECTING') {
+                        stageEl.style.background = 'rgba(234, 179, 8, 0.2)';
+                        stageEl.style.color = '#fde047';
+                    } else if (pfc.status === 'INTERLOCKED') {
+                        stageEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                        stageEl.style.color = '#fca5a5';
+                    } else {
+                        stageEl.style.background = 'rgba(59, 130, 246, 0.2)';
+                        stageEl.style.color = '#93c5fd';
+                    }
+                }
+                if (modeText) {
+                    if (data.pfc_auto) {
+                        modeText.textContent = pfc.status === 'OPTIMAL' ? 'APFC: OPTIMAL (≥0.97)' : 'APFC: AUTO (0.97 Target)';
+                        modeText.style.color = 'var(--primary)';
+                    } else {
+                        modeText.textContent = 'APFC: MANUAL';
+                        modeText.style.color = 'var(--text-muted)';
+                    }
+                }
+            }
+
             if (data.relays) {
                 const b1 = data.relays['1'] === 'ON';
                 const b2 = data.relays['2'] === 'ON';
@@ -2020,6 +2046,32 @@ async function refreshPiIpAddress() {
 }
 refreshPiIpAddress();
 setInterval(refreshPiIpAddress, 30000);
+
+// =============================================================================
+// Live Sidebar Date & Clock (Synchronized with System Clock & RTC)
+// =============================================================================
+function updateSidebarClock() {
+    const now = new Date();
+    const dateEl = document.getElementById('current-date');
+    const timeEl = document.getElementById('current-time');
+    if (dateEl) {
+        dateEl.textContent = now.toLocaleDateString('en-US', {
+            month: 'long',
+            day: '2-digit',
+            year: 'numeric'
+        });
+    }
+    if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        }) + ' PHT';
+    }
+}
+updateSidebarClock();
+setInterval(updateSidebarClock, 1000);
 
 // Remote Access card (Settings): pairing code + quick tunnel status. Only the Pi's own screen gets the code.
 async function refreshRemoteAccess() {

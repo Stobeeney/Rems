@@ -68,7 +68,9 @@ function updateClock() {
     const now = new Date();
     const timeEl = document.getElementById('m-current-time');
     if (timeEl) {
-        timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        timeEl.textContent = `${dateStr} • ${timeStr}`;
     }
 }
 
@@ -123,6 +125,19 @@ async function pollData() {
 
         const elFreq = document.getElementById('metric-freq-val');
         if (elFreq) elFreq.textContent = freq + " Hz";
+
+        // Update PFC Stage Telemetry
+        const elPfcStage = document.getElementById('m-pfc-stage');
+        if (elPfcStage && data.pfc) {
+            elPfcStage.textContent = `${data.pfc.stage_name || 'Stage 0'} (${data.pfc.status})`;
+            if (data.pfc.status === 'OPTIMAL') {
+                elPfcStage.style.color = 'var(--primary)';
+            } else if (data.pfc.status === 'CORRECTING') {
+                elPfcStage.style.color = 'var(--accent-amber)';
+            } else if (data.pfc.status === 'INTERLOCKED') {
+                elPfcStage.style.color = '#ef4444';
+            }
+        }
 
         // Update PZEM Branches
         if (data.branches) {

@@ -125,6 +125,10 @@
                         <span class="m-status" id="mode-status-load">AUTO</span>
                     </div>
                 </div>
+                <div id="m-pfc-summary" style="margin-top: 8px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <span style="color: var(--text-muted);">Capacitor Stage:</span>
+                    <strong id="m-pfc-stage" style="color: var(--primary);">Stage 0 (0 µF)</strong>
+                </div>
             </div>
         </section>
 
@@ -209,10 +213,10 @@
                     <span class="m-card-title"><i class="ph ph-info"></i> System Information</span>
                 </div>
                 <div style="font-size:12px; line-height:1.8; color:var(--text-secondary);">
-                    <div><strong>Project:</strong> REMCS (AI-Assisted Residential Energy Management Control System)</div>
+                    <div><strong>Project:</strong> REMCS (AI-Assisted Residential Energy Management And Control System)</div>
                     <div><strong>Host:</strong> Raspberry Pi 5 (Debian Linux ARM64)</div>
                     <div><strong>Sensors:</strong> 11x PZEM-004T v3.0 via CD74HC4067 MUX</div>
-                    <div><strong>Actuators:</strong> 20-Channel Optocoupled Relay Board</div>
+                    <div><strong>Actuators:</strong> 8-Channel Solid State Relay (SSR) Board</div>
                     <div><strong>Backend:</strong> Python Flask + SQLite3</div>
                 </div>
             </div>
