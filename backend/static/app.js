@@ -2083,6 +2083,8 @@ async function refreshRemoteAccess() {
         const data = await res.json();
         if (!data.success) return;
         document.getElementById('ra-pair-code').textContent = data.pair_code;
+        const sbCode = document.getElementById('sidebar-pair-code');
+        if (sbCode && data.pair_code) sbCode.textContent = data.pair_code;
         const labels = { online: 'ONLINE', starting: 'Starting…', restarting: 'Reconnecting…', error: 'Error', disabled: 'Off' };
         const st = document.getElementById('ra-status');
         st.textContent = labels[data.status] || data.status;
