@@ -51,7 +51,8 @@ system_mode = "MANUAL"  # 3 Modes: MANUAL, AI_ASSISTED, SECURITY
 
 for r_id, pin in relay_pins.items():
     try:
-        relays[r_id] = OutputDevice(pin, active_high=False, initial_value=False)
+        # SSRs use Active-HIGH triggering: HIGH (3.3V) = ON, LOW (0V) = OFF
+        relays[r_id] = OutputDevice(pin, active_high=True, initial_value=False)
         relay_status[r_id] = False
     except Exception as e:
         print(f"Error initializing relay {r_id} on pin {pin}: {e}")
