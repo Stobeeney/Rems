@@ -19,8 +19,8 @@ If you change a pin in code, regenerate it: `python3 hardware/schematic/generate
  │                  │◀─I2C──── DS3231 RTC (0x68)                 │
  └──────────────────┘                                     ┌──────┴──────┐
                                                           │    ESP32    │
-                                  S0–S3 (shared) ┌───────▶│ GPIO25/26/  │
-                                                 │        │ 27/32       │
+                                  S0–S3 (shared) ┌───────▶│ GPIO32/27/  │
+                                                 │        │ 26/25       │
                       ┌──────────────────────────┤ SIG  ┌───────┐ │             │
  PZEM #0..#10 TX ────▶│ Mux A CD74HC4067 C0..C10 │─────▶│ level │▶│ GPIO19 RX1  │
                       └──────────────────────────┤      │ conv. │ │             │
@@ -191,10 +191,10 @@ No firmware change is needed for Mux B. `selectMuxChannel()` already sets S0–S
 
 | ESP32 pin | Connects to | Purpose |
 |---|---|---|
-| GPIO25 | Mux A **S0** + Mux B **S0** | channel select bit 0 |
-| GPIO26 | Mux A **S1** + Mux B **S1** | channel select bit 1 |
-| GPIO27 | Mux A **S2** + Mux B **S2** | channel select bit 2 |
-| GPIO32 | Mux A **S3** + Mux B **S3** | channel select bit 3 |
+| GPIO32 | Mux A **S0** + Mux B **S0** | channel select bit 0 |
+| GPIO27 | Mux A **S1** + Mux B **S1** | channel select bit 1 |
+| GPIO26 | Mux A **S2** + Mux B **S2** | channel select bit 2 |
+| GPIO25 | Mux A **S3** + Mux B **S3** | channel select bit 3 |
 | GPIO19 (UART1 RX) | Converter **LV1** (HV1 → Mux A **SIG**) | selected PZEM's TX → ESP32 |
 | GPIO18 (UART1 TX) | Converter **LV2** (HV2 → Mux B **SIG**) | ESP32 → selected PZEM's RX |
 | GPIO4 | IR transmitter **unit 1** DAT (Room 1 aircon) | see §2.2 |
@@ -247,7 +247,7 @@ Serial line format (one per channel):
 
 - **No spare Pi GPIO.** The thesis design (`docs/DETAILS NG IPAPACODE.pdf`) also mentions RCWL-0516 and HC-SR501 PIR sensors. They are not in the code, and there are no free Pi pins for them. Options: a GPIO expander on I2C (e.g. MCP23017 on the existing GPIO2/3 bus) or moving sensors to the ESP32 (as was done for the aircon IR).
 - **Aircon IR remote is on the ESP32** (§2.2), with no relay. The KiCad control-wiring schematic does not show the two IR modules yet.
-- **S0–S3 are not level-shifted.** The single 4-channel converter carries RX and TX. The 5V muxes read the ESP32's 3.3V select signals as HIGH in practice (switching point about half of VCC), but that is below the 74HC datasheet's guaranteed HIGH level at 5V. If a PZEM ever reads another channel's values, add a second converter on S0–S3 (LV1–LV4 = GPIO25/26/27/32, HV1–HV4 = S0–S3).
+- **S0–S3 are not level-shifted.** The single 4-channel converter carries RX and TX. The 5V muxes read the ESP32's 3.3V select signals as HIGH in practice (switching point about half of VCC), but that is below the 74HC datasheet's guaranteed HIGH level at 5V. If a PZEM ever reads another channel's values, add a second converter on S0–S3 (LV1–LV4 = GPIO32/27/26/25, HV1–HV4 = S0–S3).
 
 ## 7. Pi setup checklist (things the pin map depends on)
 
